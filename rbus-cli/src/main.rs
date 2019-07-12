@@ -16,9 +16,5 @@ custom_error! {
 
 #[paw::main]
 fn main(_options: Options) -> Result<(), RBusCliError> {
-    use rbus::{types::DBusType, Inner};
-
-    dbg!(Inner::signature());
-
     Ok(())
 }
