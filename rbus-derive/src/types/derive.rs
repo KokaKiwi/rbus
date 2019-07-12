@@ -29,12 +29,25 @@ impl Parse for DeriveTypeDef {
 
 pub struct StructTypeDef {
     name: syn::Ident,
+    generics: syn::Generics,
     fields: syn::Fields,
 }
 
 impl StructTypeDef {
     fn impl_type(self) -> TokenStream {
         let name = self.name;
+
+        let dbus_type_path: syn::TraitBound = syn::parse_quote!(rbus_common::types::DBusType);
+
+        // Add DBusType trait dep for generics if any
+        let mut generics = self.generics;
+        if !generics.params.is_empty() {
+            let type_param_bound = syn::TypeParamBound::Trait(dbus_type_path.clone());
+            generics.type_params_mut()
+                .for_each(|type_param| type_param.bounds.push_value(type_param_bound.clone()));
+        }
+
+        let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
         let field_types = match self.fields {
             syn::Fields::Named(fields) => {
@@ -49,7 +62,7 @@ impl StructTypeDef {
         let format_str = format!("({})", "{}".repeat(field_types.len()));
 
         let tokens = quote::quote! {
-            impl crate::types::DBusType for #name {
+            impl #impl_generics #dbus_type_path for #name #ty_generics #where_clause {
                 fn code() -> u8 { b'r' }
                 fn signature() -> String { format!(#format_str, #(<#field_types>::signature()),*) }
             }
@@ -65,6 +78,7 @@ impl Parse for StructTypeDef {
 
         Ok(StructTypeDef {
             name: item.ident,
+            generics: item.generics,
             fields: item.fields,
         })
     }
