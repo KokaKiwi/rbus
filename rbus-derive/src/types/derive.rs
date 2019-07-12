@@ -86,6 +86,7 @@ impl Parse for StructTypeDef {
 
 pub struct EnumTypeDef {
     name: syn::Ident,
+    generics: syn::Generics,
     variants: syn::punctuated::Punctuated<syn::Variant, syn::Token![,]>,
 }
 
@@ -93,8 +94,22 @@ impl EnumTypeDef {
     fn impl_type(self) -> TokenStream {
         let name = self.name;
 
+        let dbus_type_path: syn::TraitBound = syn::parse_quote!(rbus_common::types::DBusType);
+
+        // Add DBusType trait dep for generics if any
+        let mut generics = self.generics;
+        if !generics.params.is_empty() {
+            let type_param_bound = syn::TypeParamBound::Trait(dbus_type_path.clone());
+            generics.type_params_mut()
+                .for_each(|type_param| type_param.bounds.push_value(type_param_bound.clone()));
+        }
+
+        let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
         let tokens = quote::quote! {
-            impl_type!(#name: 'v');
+            impl #impl_generics #dbus_type_path for #name #ty_generics #where_clause {
+                fn code() -> u8 { b'v' }
+                fn signature() -> String { "v" }
+            }
         };
 
         tokens.into()
@@ -107,6 +122,7 @@ impl Parse for EnumTypeDef {
 
         Ok(EnumTypeDef {
             name: item.ident,
+            generics: item.generics,
             variants: item.variants,
         })
     }
