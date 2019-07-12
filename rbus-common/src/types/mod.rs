@@ -11,3 +11,6 @@ pub trait DBusType {
     fn code() -> u8;
     fn signature() -> String;
 }
+
+pub trait DBusBasicType: DBusType {
+}

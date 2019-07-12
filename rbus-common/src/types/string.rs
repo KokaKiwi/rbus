@@ -3,8 +3,8 @@ use rbus_derive::impl_type;
 
 // Basic strings
 // TODO: Validate strings? (according to DBus specs)
-impl_type!(str: 's');
-impl_type!(String: 's');
+impl_type! { str: 's' [basic] }
+impl_type! { String: 's' [basic] }
 
 // Object path
 custom_error! {
@@ -34,7 +34,7 @@ impl AsRef<str> for ObjectPath {
     }
 }
 
-impl_type!(ObjectPath: 'o');
+impl_type! { ObjectPath: 'o' [basic] }
 
 // Signature
 custom_error! {
@@ -64,4 +64,4 @@ impl AsRef<str> for Signature {
     }
 }
 
-impl_type!(Signature: 'g');
+impl_type! { Signature: 'g' [basic] }

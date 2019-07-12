@@ -20,7 +20,7 @@ pub fn impl_basic_type(data: BasicTypeDef) -> TokenStream {
     let BasicTypeDef { ty, code } = data;
 
     let tokens = quote::quote! {
-        rbus_derive::impl_type!(#ty: #code);
+        rbus_derive::impl_type! { #ty: #code [basic] }
     };
 
     tokens.into()
