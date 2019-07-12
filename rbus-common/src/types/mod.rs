@@ -1,5 +1,6 @@
 pub use array::*;
 pub use basic::*;
+pub use dict::*;
 #[doc(hidden)]
 pub use rbus_derive::DBusType;
 pub use string::*;
@@ -7,6 +8,7 @@ pub use tuple::*;
 
 mod array;
 mod basic;
+mod dict;
 mod string;
 mod tuple;
 
