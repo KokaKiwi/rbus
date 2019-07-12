@@ -1,0 +1,20 @@
+[package]
+name = "rbus-cli"
+version = "0.1.0"
+authors = ["KokaKiwi <kokakiwi+git@kokakiwi.net>"]
+edition = "2018"
+
+[[bin]]
+name = "rbus-ctl"
+path = "src/main.rs"
+
+[dependencies]
+custom_error = "*"
+log = "*"
+log4rs = { version = "*", features = ["toml_format"] }
+paw = "*"
+rbus = "*"
+rbus-common = "*"
+serde = { version = "*", features = ["derive"] }
+structopt = { version = "*", features = ["paw"] }
+toml = "*"

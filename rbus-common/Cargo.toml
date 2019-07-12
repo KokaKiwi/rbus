@@ -1,0 +1,10 @@
+[package]
+name = "rbus-common"
+version = "0.1.0"
+authors = ["KokaKiwi <kokakiwi+git@kokakiwi.net>"]
+edition = "2018"
+
+[dependencies]
+byteorder = "*"
+custom_error = "*"
+rbus-derive = "*"

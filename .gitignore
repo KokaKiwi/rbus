@@ -1,0 +1,12 @@
+# Rust stuff
+/target
+*/target
+Cargo.lock
+
+# Generated stuff
+rbus/rbus.h
+rbus/rbus.hpp
+
+# Misc stuff
+.*
+!.gitignore

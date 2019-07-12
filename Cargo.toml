@@ -1,0 +1,12 @@
+[workspace]
+members = [
+    "rbus-derive",
+    "rbus-common",
+    "rbus",
+    "rbus-cli",
+]
+
+[patch.crates-io]
+rbus = { path = "rbus" }
+rbus-common = { path = "rbus-common" }
+rbus-derive = { path = "rbus-derive" }

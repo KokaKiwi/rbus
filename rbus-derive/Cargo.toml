@@ -1,0 +1,13 @@
+[package]
+name = "rbus-derive"
+version = "0.1.0"
+authors = ["KokaKiwi <kokakiwi+git@kokakiwi.net>"]
+edition = "2018"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+proc-macro2 = "*"
+quote = "*"
+syn = { version = "*", features = ["full"] }

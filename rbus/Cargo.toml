@@ -1,0 +1,15 @@
+[package]
+name = "rbus"
+version = "0.1.0"
+authors = ["KokaKiwi <kokakiwi+git@kokakiwi.net>"]
+edition = "2018"
+
+[lib]
+crate-type = ["lib", "staticlib", "cdylib"]
+
+[dependencies]
+custom_error = "*"
+rbus-common = "*"
+
+[build-dependencies]
+cbindgen = "*"
