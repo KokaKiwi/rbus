@@ -77,8 +77,10 @@ pub struct EnumTypeDef {
 
 impl EnumTypeDef {
     fn impl_type(self) -> TokenStream {
-        let tokens = quote::quote! {
+        let name = self.name;
 
+        let tokens = quote::quote! {
+            impl_type!(#name: 'v');
         };
 
         tokens.into()
