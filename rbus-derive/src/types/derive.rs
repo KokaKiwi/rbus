@@ -132,6 +132,7 @@ impl EnumTypeDef {
             impl #impl_generics #dbus_type_path for #name #ty_generics #where_clause {
                 fn code() -> u8 { b'v' }
                 fn signature() -> String { "v" }
+                fn alignment() -> u8 { 1 }
             }
         };
 
