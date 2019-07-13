@@ -35,6 +35,7 @@ mod tests {
     #[test]
     fn test_signature_struct_packed() {
         #[derive(DBusType)]
+        #[settings(module = "crate")]
         struct Arg(u8, String);
 
         assert_eq!(<(u32, Arg)>::signature(), "u(ys)");
