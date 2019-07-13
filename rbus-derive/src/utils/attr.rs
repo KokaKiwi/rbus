@@ -1,5 +1,5 @@
 use std::iter::FromIterator;
-use syn::parse::Result;
+use syn::parse::{Parse, ParseStream, Result};
 use syn::spanned::Spanned;
 
 pub struct Metas(Vec<syn::NestedMeta>);
@@ -89,6 +89,12 @@ impl Metas {
             None => Ok(None),
         })
     }
+
+    pub fn parse_named(input: ParseStream, name: &str) -> Result<Self> {
+        input
+            .parse()
+            .map(|metas: Metas| metas.find_meta_nested(name))
+    }
 }
 
 impl std::ops::Deref for Metas {
@@ -117,6 +123,12 @@ impl From<Vec<syn::NestedMeta>> for Metas {
 impl From<Option<Vec<syn::NestedMeta>>> for Metas {
     fn from(value: Option<Vec<syn::NestedMeta>>) -> Metas {
         Metas(value.unwrap_or_else(Vec::new))
+    }
+}
+
+impl Parse for Metas {
+    fn parse(input: ParseStream) -> Result<Self> {
+        input.call(syn::Attribute::parse_outer).map(parse_metas)
     }
 }
 

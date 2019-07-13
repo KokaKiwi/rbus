@@ -1,4 +1,4 @@
-use crate::utils::attr::{parse_named_metas, Metas};
+use crate::utils::attr::Metas;
 pub use basic::impl_basic_type;
 pub use derive::derive_type;
 use proc_macro::TokenStream;
@@ -8,6 +8,10 @@ use syn::spanned::Spanned;
 mod basic;
 mod derive;
 
+fn parse_dbus_metas(input: ParseStream) -> Result<Metas> {
+    Metas::parse_named(input, "dbus")
+}
+
 pub struct TypeDef {
     ty: syn::Type,
     code: syn::LitChar,
@@ -16,8 +20,7 @@ pub struct TypeDef {
 
 impl Parse for TypeDef {
     fn parse(input: ParseStream) -> Result<Self> {
-        let attrs = input.call(syn::Attribute::parse_outer)?;
-        let metas = parse_named_metas(attrs, "dbus");
+        let metas = input.call(parse_dbus_metas)?;
 
         let ty = input.parse()?;
         input.parse::<syn::Token![:]>()?;
