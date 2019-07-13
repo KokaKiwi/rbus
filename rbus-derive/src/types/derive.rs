@@ -43,7 +43,7 @@ impl StructTypeDef {
         let rbus_module = self
             .settings
             .find_meta_value_str("module")?
-            .unwrap_or("rbus_common".into());
+            .unwrap_or_else(|| "rbus_common".into());
         let rbus_module = syn::Ident::new(rbus_module.as_str(), Span::call_site());
         let dbus_type_path: syn::TraitBound = syn::parse_quote!(#rbus_module::types::DBusType);
 
@@ -102,6 +102,7 @@ pub struct EnumTypeDef {
     name: syn::Ident,
     settings: Metas,
     generics: syn::Generics,
+    #[allow(dead_code)]
     variants: syn::punctuated::Punctuated<syn::Variant, syn::Token![,]>,
 }
 
@@ -112,7 +113,7 @@ impl EnumTypeDef {
         let rbus_module = self
             .settings
             .find_meta_value_str("module")?
-            .unwrap_or("rbus_common".into());
+            .unwrap_or_else(|| "rbus_common".into());
         let rbus_module = syn::Ident::new(rbus_module.as_str(), Span::call_site());
         let dbus_type_path: syn::TraitBound = syn::parse_quote!(#rbus_module::types::DBusType);
 

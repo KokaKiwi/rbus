@@ -4,6 +4,7 @@ use syn::spanned::Spanned;
 
 pub struct Metas(Vec<syn::NestedMeta>);
 
+#[allow(dead_code)]
 impl Metas {
     pub fn values(&self) -> Vec<&syn::Lit> {
         self.0

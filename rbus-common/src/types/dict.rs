@@ -72,7 +72,7 @@ impl<K: DBusBasicType, V: DBusType> DBusType for Dict<K, V> {
 }
 
 // HashMap
-impl<K: DBusBasicType, V: DBusType> DBusType for HashMap<K, V> {
+impl<K: DBusBasicType, V: DBusType, S: std::hash::BuildHasher> DBusType for HashMap<K, V, S> {
     fn code() -> u8 {
         b'e'
     }
