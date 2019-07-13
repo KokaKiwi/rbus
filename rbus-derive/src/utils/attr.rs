@@ -5,7 +5,7 @@ use syn::spanned::Spanned;
 pub struct Metas(Option<Vec<syn::NestedMeta>>);
 
 impl Metas {
-    pub fn find_lits(&self) -> Option<Vec<&syn::Lit>> {
+    pub fn values(&self) -> Option<Vec<&syn::Lit>> {
         match &self.0 {
             Some(metas) => {
                 let lits = metas
