@@ -1,6 +1,51 @@
 use proc_macro::TokenStream;
 use syn::parse::{Parse, ParseStream, Result};
 
+type DeriveSettings = Vec<syn::Meta>;
+
+trait DeriveCommon {
+    fn settings(&self) -> &Option<DeriveSettings>;
+
+    fn find_setting_meta<'a>(&'a self, name: &str) -> Option<&'a syn::Meta> {
+        match self.settings() {
+            Some(metas) => metas.iter().find(|meta| meta.name() == name),
+            None => None
+        }
+    }
+
+    fn find_setting_word(&self, name: &str) -> bool {
+        match self.find_setting_meta(name) {
+            Some(syn::Meta::Word(_)) => true,
+            _ => false,
+        }
+    }
+
+    fn find_setting_value<'a>(&'a self, name: &str) -> Option<&'a syn::Lit> {
+        match self.find_setting_meta(name) {
+            Some(syn::Meta::NameValue(meta)) => Some(&meta.lit),
+            _ => None
+        }
+    }
+
+    fn find_setting_value_str(&self, name: &str) -> Option<String> {
+        match self.find_setting_value(name) {
+            Some(syn::Lit::Str(lit)) => Some(lit.value()),
+            _ => None,
+        }
+    }
+
+    fn parse_settings(attrs: Vec<syn::Attribute>) -> Option<DeriveSettings> {
+        attrs.into_iter()
+            .find_map(|attr| attr.parse_meta().ok())
+            .filter(|meta| meta.name() == "settings")
+            .and_then(|meta| if let syn::Meta::List(metas) = meta { Some(metas) } else { None })
+            .map(|metalist| metalist.nested.iter()
+                 .filter_map(|item| if let syn::NestedMeta::Meta(meta) = item { Some(meta) } else { None })
+                 .map(Clone::clone)
+                 .collect())
+    }
+}
+
 pub enum DeriveTypeDef {
     Struct(StructTypeDef),
     Enum(EnumTypeDef),
@@ -29,15 +74,23 @@ impl Parse for DeriveTypeDef {
 
 pub struct StructTypeDef {
     name: syn::Ident,
+    settings: Option<Vec<syn::Meta>>,
     generics: syn::Generics,
     fields: syn::Fields,
 }
 
+impl DeriveCommon for StructTypeDef {
+    fn settings(&self) -> &Option<DeriveSettings> {
+        &self.settings
+    }
+}
+
 impl StructTypeDef {
     fn impl_type(self) -> TokenStream {
-        let name = self.name;
+        let name = &self.name;
 
-        let dbus_type_path: syn::TraitBound = syn::parse_quote!(rbus_common::types::DBusType);
+        let rbus_module = self.find_setting_value_str("module").unwrap_or("rbus_common".into());
+        let dbus_type_path: syn::TraitBound = syn::parse_quote!(#rbus_module::types::DBusType);
 
         // Add DBusType trait dep for generics if any
         let mut generics = self.generics;
@@ -76,8 +129,11 @@ impl Parse for StructTypeDef {
     fn parse(input: ParseStream) -> Result<Self> {
         let item = input.parse::<syn::ItemStruct>()?;
 
+        let settings = Self::parse_settings(item.attrs);
+
         Ok(StructTypeDef {
             name: item.ident,
+            settings,
             generics: item.generics,
             fields: item.fields,
         })
@@ -86,15 +142,23 @@ impl Parse for StructTypeDef {
 
 pub struct EnumTypeDef {
     name: syn::Ident,
+    settings: Option<Vec<syn::Meta>>,
     generics: syn::Generics,
     variants: syn::punctuated::Punctuated<syn::Variant, syn::Token![,]>,
 }
 
+impl DeriveCommon for EnumTypeDef {
+    fn settings(&self) -> &Option<DeriveSettings> {
+        &self.settings
+    }
+}
+
 impl EnumTypeDef {
     fn impl_type(self) -> TokenStream {
-        let name = self.name;
+        let name = &self.name;
 
-        let dbus_type_path: syn::TraitBound = syn::parse_quote!(rbus_common::types::DBusType);
+        let rbus_module = self.find_setting_value_str("module").unwrap_or("rbus_common".into());
+        let dbus_type_path: syn::TraitBound = syn::parse_quote!(#rbus_module::types::DBusType);
 
         // Add DBusType trait dep for generics if any
         let mut generics = self.generics;
@@ -120,8 +184,11 @@ impl Parse for EnumTypeDef {
     fn parse(input: ParseStream) -> Result<Self> {
         let item = input.parse::<syn::ItemEnum>()?;
 
+        let settings = Self::parse_settings(item.attrs);
+
         Ok(EnumTypeDef {
             name: item.ident,
+            settings,
             generics: item.generics,
             variants: item.variants,
         })
