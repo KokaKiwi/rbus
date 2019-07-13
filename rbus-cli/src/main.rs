@@ -10,7 +10,7 @@ struct Options {
 }
 
 custom_error! {
-    pub RBusCliError
+    RBusCliError
         Io { source: std::io::Error } = "I/O Error: {source}",
 }
 
