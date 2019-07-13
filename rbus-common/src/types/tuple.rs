@@ -1,12 +1,14 @@
 use super::DBusType;
 
+pub trait PackedDBusTypes {
+    fn signature() -> String;
+}
+
 macro_rules! impl_tuple_type {
     ($($index:tt: $ty:ident),*) => {
-        impl<$($ty: DBusType),*> DBusType for ($($ty),*,) {
-            fn code() -> u8 { b'r' }
+        impl<$($ty: DBusType),*> PackedDBusTypes for ($($ty),*,) {
             fn signature() -> String {
-                let inner = [$($ty::signature()),*].concat();
-                format!("({})", inner)
+                [$($ty::signature()),*].concat()
             }
         }
     }
