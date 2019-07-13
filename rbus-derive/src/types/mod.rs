@@ -1,4 +1,4 @@
-use crate::utils::attr::Metas;
+use crate::utils::attr::{Metas, parse_metas};
 use proc_macro::TokenStream;
 use syn::parse::{Parse, ParseStream, Result};
 pub use basic::impl_basic_type;
@@ -15,21 +15,15 @@ pub struct TypeDef {
 
 impl Parse for TypeDef {
     fn parse(input: ParseStream) -> Result<Self> {
+        let attrs = input.call(syn::Attribute::parse_outer)?;
+        let metas = parse_metas(attrs);
+
         let ty = input.parse()?;
         input.parse::<syn::Token![:]>()?;
         let code = input.parse()?;
 
-        let metas = if input.peek(syn::token::Bracket) {
-            let content;
-            syn::bracketed!(content in input);
-            Some(content.parse_terminated::<_, syn::Token![,]>(syn::Meta::parse)?
-                 .iter().map(Clone::clone).collect())
-        } else {
-            None
-        }.into();
-
-    Ok(TypeDef { ty, code, metas })
-}
+        Ok(TypeDef { ty, code, metas })
+    }
 }
 
 pub fn impl_type(data: TypeDef) -> TokenStream {

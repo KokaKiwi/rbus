@@ -48,10 +48,20 @@ impl From<Option<Vec<syn::Meta>>> for Metas {
     }
 }
 
-pub fn find_metas(attrs: Vec<syn::Attribute>, name: &str) -> Metas {
+pub fn parse_named_metas(attrs: Vec<syn::Attribute>, name: &str) -> Metas {
     attrs.into_iter()
         .find_map(|attr| attr.parse_meta().ok())
         .filter(|meta| meta.name() == name)
+        .and_then(|meta| if let syn::Meta::List(metas) = meta { Some(metas) } else { None })
+        .map(|metalist| metalist.nested.iter()
+             .filter_map(|item| if let syn::NestedMeta::Meta(meta) = item { Some(meta) } else { None })
+             .map(Clone::clone)
+             .collect()).into()
+}
+
+pub fn parse_metas(attrs: Vec<syn::Attribute>) -> Metas {
+    attrs.into_iter()
+        .find_map(|attr| attr.parse_meta().ok())
         .and_then(|meta| if let syn::Meta::List(metas) = meta { Some(metas) } else { None })
         .map(|metalist| metalist.nested.iter()
              .filter_map(|item| if let syn::NestedMeta::Meta(meta) = item { Some(meta) } else { None })

@@ -1,4 +1,4 @@
-use crate::utils::attr::{Metas, find_metas};
+use crate::utils::attr::{Metas, parse_named_metas};
 use proc_macro::TokenStream;
 use proc_macro2::Span;
 use syn::parse::{Parse, ParseStream, Result};
@@ -81,7 +81,7 @@ impl Parse for StructTypeDef {
     fn parse(input: ParseStream) -> Result<Self> {
         let item = input.parse::<syn::ItemStruct>()?;
 
-        let settings = find_metas(item.attrs, "dbus");
+        let settings = parse_named_metas(item.attrs, "dbus");
 
         Ok(StructTypeDef {
             name: item.ident,
@@ -131,7 +131,7 @@ impl Parse for EnumTypeDef {
     fn parse(input: ParseStream) -> Result<Self> {
         let item = input.parse::<syn::ItemEnum>()?;
 
-        let settings = find_metas(item.attrs, "dbus");
+        let settings = parse_named_metas(item.attrs, "dbus");
 
         Ok(EnumTypeDef {
             name: item.ident,
