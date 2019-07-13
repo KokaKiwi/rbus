@@ -1,5 +1,7 @@
 use proc_macro::TokenStream;
+use proc_macro2::Span;
 use syn::parse::{Parse, ParseStream, Result};
+use syn::spanned::Spanned;
 
 type DeriveSettings = Vec<syn::Meta>;
 
@@ -13,25 +15,28 @@ trait DeriveCommon {
         }
     }
 
-    fn find_setting_word(&self, name: &str) -> bool {
+    fn find_setting_word(&self, name: &str) -> Result<bool> {
         match self.find_setting_meta(name) {
-            Some(syn::Meta::Word(_)) => true,
-            _ => false,
+            Some(syn::Meta::Word(_)) => Ok(true),
+            Some(meta) => Err(syn::Error::new(meta.span(), format!("Expected ident: `{}`", name))),
+            _ => Ok(false),
         }
     }
 
-    fn find_setting_value<'a>(&'a self, name: &str) -> Option<&'a syn::Lit> {
+    fn find_setting_value<'a>(&'a self, name: &str) -> Result<Option<&'a syn::Lit>> {
         match self.find_setting_meta(name) {
-            Some(syn::Meta::NameValue(meta)) => Some(&meta.lit),
-            _ => None
+            Some(syn::Meta::NameValue(meta)) => Ok(Some(&meta.lit)),
+            Some(meta) => Err(syn::Error::new(meta.span(), format!("Expected named value: `{}`", name))),
+            _ => Ok(None)
         }
     }
 
-    fn find_setting_value_str(&self, name: &str) -> Option<String> {
-        match self.find_setting_value(name) {
-            Some(syn::Lit::Str(lit)) => Some(lit.value()),
-            _ => None,
-        }
+    fn find_setting_value_str(&self, name: &str) -> Result<Option<String>> {
+        self.find_setting_value(name).and_then(|value| match value {
+            Some(syn::Lit::Str(lit)) => Ok(Some(lit.value())),
+            Some(meta) => Err(syn::Error::new(meta.span(), format!("Expected string value: `{}`", name))),
+            _ => Ok(None),
+        })
     }
 
     fn parse_settings(attrs: Vec<syn::Attribute>) -> Option<DeriveSettings> {
@@ -52,7 +57,7 @@ pub enum DeriveTypeDef {
 }
 
 impl DeriveTypeDef {
-    pub fn impl_type(self) -> TokenStream {
+    pub fn impl_type(self) -> Result<TokenStream> {
         match self {
             DeriveTypeDef::Struct(def) => def.impl_type(),
             DeriveTypeDef::Enum(def) => def.impl_type(),
@@ -86,10 +91,11 @@ impl DeriveCommon for StructTypeDef {
 }
 
 impl StructTypeDef {
-    fn impl_type(self) -> TokenStream {
+    fn impl_type(self) -> Result<TokenStream> {
         let name = &self.name;
 
-        let rbus_module = self.find_setting_value_str("module").unwrap_or("rbus_common".into());
+        let rbus_module = self.find_setting_value_str("module")?.unwrap_or("rbus_common".into());
+        let rbus_module = syn::Ident::new(rbus_module.as_str(), Span::call_site());
         let dbus_type_path: syn::TraitBound = syn::parse_quote!(#rbus_module::types::DBusType);
 
         // Add DBusType trait dep for generics if any
@@ -121,7 +127,7 @@ impl StructTypeDef {
             }
         };
 
-        tokens.into()
+        Ok(tokens.into())
     }
 }
 
@@ -154,10 +160,11 @@ impl DeriveCommon for EnumTypeDef {
 }
 
 impl EnumTypeDef {
-    fn impl_type(self) -> TokenStream {
+    fn impl_type(self) -> Result<TokenStream> {
         let name = &self.name;
 
-        let rbus_module = self.find_setting_value_str("module").unwrap_or("rbus_common".into());
+        let rbus_module = self.find_setting_value_str("module")?.unwrap_or("rbus_common".into());
+        let rbus_module = syn::Ident::new(rbus_module.as_str(), Span::call_site());
         let dbus_type_path: syn::TraitBound = syn::parse_quote!(#rbus_module::types::DBusType);
 
         // Add DBusType trait dep for generics if any
@@ -176,7 +183,7 @@ impl EnumTypeDef {
             }
         };
 
-        tokens.into()
+        Ok(tokens.into())
     }
 }
 
@@ -195,6 +202,6 @@ impl Parse for EnumTypeDef {
     }
 }
 
-pub fn derive_type(data: DeriveTypeDef) -> TokenStream {
+pub fn derive_type(data: DeriveTypeDef) -> Result<TokenStream> {
     data.impl_type()
 }
