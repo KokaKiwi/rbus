@@ -42,6 +42,20 @@ impl Metas {
         }
     }
 
+    pub fn find_meta_list(&self, name: &str) -> Result<Option<Metas>> {
+        match self.find_meta(name) {
+            Some(syn::Meta::List(list)) => {
+                let nested_metas = list.nested.iter().map(Clone::clone).collect::<Vec<_>>();
+                Ok(Some(nested_metas.into()))
+            }
+            Some(meta) => Err(syn::Error::new(
+                meta.span(),
+                format!("Expected list: `{}`", name),
+            )),
+            None => Ok(None),
+        }
+    }
+
     pub fn find_meta_value<'a>(&'a self, name: &str) -> Result<Option<&'a syn::Lit>> {
         match self.find_meta(name) {
             Some(syn::Meta::NameValue(meta)) => Ok(Some(&meta.lit)),
@@ -109,6 +123,6 @@ pub fn parse_metas(attrs: Vec<syn::Attribute>) -> Metas {
         .into_iter()
         .filter_map(|attr| attr.parse_meta().ok()) // TODO: Don't silently ignore errors.
         .map(syn::NestedMeta::Meta)
-        .collect::<Vec<syn::NestedMeta>>()
+        .collect::<Vec<_>>()
         .into()
 }
