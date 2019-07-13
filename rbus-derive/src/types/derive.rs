@@ -1,4 +1,4 @@
-use crate::utils::attr::{Metas, parse_named_metas};
+use crate::utils::attr::{parse_named_metas, Metas};
 use proc_macro::TokenStream;
 use proc_macro2::Span;
 use syn::parse::{Parse, ParseStream, Result};
@@ -40,7 +40,10 @@ impl StructTypeDef {
     fn impl_type(self) -> Result<TokenStream> {
         let name = &self.name;
 
-        let rbus_module = self.settings.find_meta_value_str("module")?.unwrap_or("rbus_common".into());
+        let rbus_module = self
+            .settings
+            .find_meta_value_str("module")?
+            .unwrap_or("rbus_common".into());
         let rbus_module = syn::Ident::new(rbus_module.as_str(), Span::call_site());
         let dbus_type_path: syn::TraitBound = syn::parse_quote!(#rbus_module::types::DBusType);
 
@@ -48,7 +51,8 @@ impl StructTypeDef {
         let mut generics = self.generics;
         if !generics.params.is_empty() {
             let type_param_bound = syn::TypeParamBound::Trait(dbus_type_path.clone());
-            generics.type_params_mut()
+            generics
+                .type_params_mut()
                 .for_each(|type_param| type_param.bounds.push_value(type_param_bound.clone()));
         }
 
@@ -58,9 +62,11 @@ impl StructTypeDef {
             syn::Fields::Named(fields) => {
                 fields.named.iter().map(|field| field.ty.clone()).collect()
             }
-            syn::Fields::Unnamed(fields) => {
-                fields.unnamed.iter().map(|field| field.ty.clone()).collect()
-            }
+            syn::Fields::Unnamed(fields) => fields
+                .unnamed
+                .iter()
+                .map(|field| field.ty.clone())
+                .collect(),
             syn::Fields::Unit => Vec::new(),
         };
 
@@ -103,7 +109,10 @@ impl EnumTypeDef {
     fn impl_type(self) -> Result<TokenStream> {
         let name = &self.name;
 
-        let rbus_module = self.settings.find_meta_value_str("module")?.unwrap_or("rbus_common".into());
+        let rbus_module = self
+            .settings
+            .find_meta_value_str("module")?
+            .unwrap_or("rbus_common".into());
         let rbus_module = syn::Ident::new(rbus_module.as_str(), Span::call_site());
         let dbus_type_path: syn::TraitBound = syn::parse_quote!(#rbus_module::types::DBusType);
 
@@ -111,7 +120,8 @@ impl EnumTypeDef {
         let mut generics = self.generics;
         if !generics.params.is_empty() {
             let type_param_bound = syn::TypeParamBound::Trait(dbus_type_path.clone());
-            generics.type_params_mut()
+            generics
+                .type_params_mut()
                 .for_each(|type_param| type_param.bounds.push_value(type_param_bound.clone()));
         }
 

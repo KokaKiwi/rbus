@@ -1,8 +1,8 @@
-use crate::utils::attr::{Metas, parse_metas};
-use proc_macro::TokenStream;
-use syn::parse::{Parse, ParseStream, Result};
+use crate::utils::attr::{parse_metas, Metas};
 pub use basic::impl_basic_type;
 pub use derive::derive_type;
+use proc_macro::TokenStream;
+use syn::parse::{Parse, ParseStream, Result};
 
 mod basic;
 mod derive;
@@ -27,7 +27,9 @@ impl Parse for TypeDef {
 }
 
 pub fn impl_type(data: TypeDef) -> TokenStream {
-    let TypeDef { ref ty, ref code, .. } = data;
+    let TypeDef {
+        ref ty, ref code, ..
+    } = data;
 
     let signature = format!("{}", code.value());
 

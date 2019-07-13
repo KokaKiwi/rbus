@@ -9,7 +9,8 @@ fn generate_headers(lang: Language, out_filename: &str) {
         .with_language(lang)
         .with_include_guard("rbus_h")
         .with_include_version(true)
-        .generate().expect("Unable to generate bindings.")
+        .generate()
+        .expect("Unable to generate bindings.")
         .write_to_file(out_filename);
 }
 

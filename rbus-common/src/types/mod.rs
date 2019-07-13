@@ -18,11 +18,14 @@ pub trait DBusType {
 }
 
 impl<T: DBusType> DBusType for &T {
-    fn code() -> u8 { T::code() }
-    fn signature() -> String { T::signature() }
+    fn code() -> u8 {
+        T::code()
+    }
+    fn signature() -> String {
+        T::signature()
+    }
 }
 
-pub trait DBusBasicType: DBusType {
-}
+pub trait DBusBasicType: DBusType {}
 
 impl<T: DBusBasicType> DBusBasicType for &T {}

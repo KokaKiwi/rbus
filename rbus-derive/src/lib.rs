@@ -32,5 +32,5 @@ pub fn impl_type(item: TokenStream) -> TokenStream {
 
 #[proc_macro_derive(DBusType, attributes(dbus))]
 pub fn derive_dbus_type(item: TokenStream) -> TokenStream {
-    impl_macro_input!(? types::derive_type, item)
+    impl_macro_input!(?types::derive_type, item)
 }

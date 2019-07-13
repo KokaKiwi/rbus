@@ -1,7 +1,7 @@
+use super::{DBusBasicType, DBusType};
 use std::collections::HashMap;
 use std::hash::Hash;
 use std::ops::Deref;
-use super::{DBusType, DBusBasicType};
 
 // Dict (list of dict entries)
 #[derive(Debug, Clone, PartialEq)]
@@ -32,7 +32,8 @@ pub struct Dict<K, V>(Vec<DictEntry<K, V>>);
 
 impl<K, V> Dict<K, V> {
     pub fn into_hashmap(self) -> HashMap<K, V>
-        where K: Eq + Hash
+    where
+        K: Eq + Hash,
     {
         self.0.into_iter().map(|entry| (entry.0, entry.1)).collect()
     }
@@ -59,12 +60,20 @@ impl<K, V> From<Vec<(K, V)>> for Dict<K, V> {
 }
 
 impl<K: DBusBasicType, V: DBusType> DBusType for Dict<K, V> {
-    fn code() -> u8 { b'e' }
-    fn signature() -> String { format!("a{{{}{}}}", K::signature(), V::signature()) }
+    fn code() -> u8 {
+        b'e'
+    }
+    fn signature() -> String {
+        format!("a{{{}{}}}", K::signature(), V::signature())
+    }
 }
 
 // HashMap
 impl<K: DBusBasicType, V: DBusType> DBusType for HashMap<K, V> {
-    fn code() -> u8 { b'e' }
-    fn signature() -> String { <Dict<K, V>>::signature() }
+    fn code() -> u8 {
+        b'e'
+    }
+    fn signature() -> String {
+        <Dict<K, V>>::signature()
+    }
 }
