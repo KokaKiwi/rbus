@@ -76,6 +76,7 @@ impl StructTypeDef {
             impl #impl_generics #dbus_type_path for #name #ty_generics #where_clause {
                 fn code() -> u8 { b'r' }
                 fn signature() -> String { format!(#format_str, #(<#field_types>::signature()),*) }
+                fn alignment() -> u8 { 8 }
             }
         };
 
