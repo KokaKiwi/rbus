@@ -1,55 +1,7 @@
+use crate::utils::attr::{Metas, find_metas};
 use proc_macro::TokenStream;
 use proc_macro2::Span;
 use syn::parse::{Parse, ParseStream, Result};
-use syn::spanned::Spanned;
-
-type DeriveSettings = Vec<syn::Meta>;
-
-trait DeriveCommon {
-    fn settings(&self) -> &Option<DeriveSettings>;
-
-    fn find_setting_meta<'a>(&'a self, name: &str) -> Option<&'a syn::Meta> {
-        match self.settings() {
-            Some(metas) => metas.iter().find(|meta| meta.name() == name),
-            None => None
-        }
-    }
-
-    fn find_setting_word(&self, name: &str) -> Result<bool> {
-        match self.find_setting_meta(name) {
-            Some(syn::Meta::Word(_)) => Ok(true),
-            Some(meta) => Err(syn::Error::new(meta.span(), format!("Expected ident: `{}`", name))),
-            _ => Ok(false),
-        }
-    }
-
-    fn find_setting_value<'a>(&'a self, name: &str) -> Result<Option<&'a syn::Lit>> {
-        match self.find_setting_meta(name) {
-            Some(syn::Meta::NameValue(meta)) => Ok(Some(&meta.lit)),
-            Some(meta) => Err(syn::Error::new(meta.span(), format!("Expected named value: `{}`", name))),
-            _ => Ok(None)
-        }
-    }
-
-    fn find_setting_value_str(&self, name: &str) -> Result<Option<String>> {
-        self.find_setting_value(name).and_then(|value| match value {
-            Some(syn::Lit::Str(lit)) => Ok(Some(lit.value())),
-            Some(meta) => Err(syn::Error::new(meta.span(), format!("Expected string value: `{}`", name))),
-            _ => Ok(None),
-        })
-    }
-
-    fn parse_settings(attrs: Vec<syn::Attribute>) -> Option<DeriveSettings> {
-        attrs.into_iter()
-            .find_map(|attr| attr.parse_meta().ok())
-            .filter(|meta| meta.name() == "settings")
-            .and_then(|meta| if let syn::Meta::List(metas) = meta { Some(metas) } else { None })
-            .map(|metalist| metalist.nested.iter()
-                 .filter_map(|item| if let syn::NestedMeta::Meta(meta) = item { Some(meta) } else { None })
-                 .map(Clone::clone)
-                 .collect())
-    }
-}
 
 pub enum DeriveTypeDef {
     Struct(StructTypeDef),
@@ -79,22 +31,16 @@ impl Parse for DeriveTypeDef {
 
 pub struct StructTypeDef {
     name: syn::Ident,
-    settings: Option<Vec<syn::Meta>>,
+    settings: Metas,
     generics: syn::Generics,
     fields: syn::Fields,
-}
-
-impl DeriveCommon for StructTypeDef {
-    fn settings(&self) -> &Option<DeriveSettings> {
-        &self.settings
-    }
 }
 
 impl StructTypeDef {
     fn impl_type(self) -> Result<TokenStream> {
         let name = &self.name;
 
-        let rbus_module = self.find_setting_value_str("module")?.unwrap_or("rbus_common".into());
+        let rbus_module = self.settings.find_meta_value_str("module")?.unwrap_or("rbus_common".into());
         let rbus_module = syn::Ident::new(rbus_module.as_str(), Span::call_site());
         let dbus_type_path: syn::TraitBound = syn::parse_quote!(#rbus_module::types::DBusType);
 
@@ -135,7 +81,7 @@ impl Parse for StructTypeDef {
     fn parse(input: ParseStream) -> Result<Self> {
         let item = input.parse::<syn::ItemStruct>()?;
 
-        let settings = Self::parse_settings(item.attrs);
+        let settings = find_metas(item.attrs, "dbus");
 
         Ok(StructTypeDef {
             name: item.ident,
@@ -148,22 +94,16 @@ impl Parse for StructTypeDef {
 
 pub struct EnumTypeDef {
     name: syn::Ident,
-    settings: Option<Vec<syn::Meta>>,
+    settings: Metas,
     generics: syn::Generics,
     variants: syn::punctuated::Punctuated<syn::Variant, syn::Token![,]>,
-}
-
-impl DeriveCommon for EnumTypeDef {
-    fn settings(&self) -> &Option<DeriveSettings> {
-        &self.settings
-    }
 }
 
 impl EnumTypeDef {
     fn impl_type(self) -> Result<TokenStream> {
         let name = &self.name;
 
-        let rbus_module = self.find_setting_value_str("module")?.unwrap_or("rbus_common".into());
+        let rbus_module = self.settings.find_meta_value_str("module")?.unwrap_or("rbus_common".into());
         let rbus_module = syn::Ident::new(rbus_module.as_str(), Span::call_site());
         let dbus_type_path: syn::TraitBound = syn::parse_quote!(#rbus_module::types::DBusType);
 
@@ -191,7 +131,7 @@ impl Parse for EnumTypeDef {
     fn parse(input: ParseStream) -> Result<Self> {
         let item = input.parse::<syn::ItemEnum>()?;
 
-        let settings = Self::parse_settings(item.attrs);
+        let settings = find_metas(item.attrs, "dbus");
 
         Ok(EnumTypeDef {
             name: item.ident,

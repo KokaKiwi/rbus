@@ -4,6 +4,7 @@ use proc_macro::TokenStream;
 use syn::parse_macro_input;
 
 mod types;
+mod utils;
 
 macro_rules! impl_macro_input {
     ($fun:path, $($arg:ident: $ty:ty),*) => {
@@ -29,7 +30,7 @@ pub fn impl_type(item: TokenStream) -> TokenStream {
     impl_macro_input!(types::impl_type, item)
 }
 
-#[proc_macro_derive(DBusType, attributes(settings))]
+#[proc_macro_derive(DBusType, attributes(dbus))]
 pub fn derive_dbus_type(item: TokenStream) -> TokenStream {
     impl_macro_input!(? types::derive_type, item)
 }
