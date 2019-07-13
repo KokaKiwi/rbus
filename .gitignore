@@ -10,3 +10,5 @@ rbus/rbus.hpp
 # Misc stuff
 .*
 !.gitignore
+!.gitlab-ci.yml
+!.gitlab-ci-matrix.yml
