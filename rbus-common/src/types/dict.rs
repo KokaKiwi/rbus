@@ -66,6 +66,9 @@ impl<K: DBusBasicType, V: DBusType> DBusType for Dict<K, V> {
     fn signature() -> String {
         format!("a{{{}{}}}", K::signature(), V::signature())
     }
+    fn alignment() -> u8 {
+        8
+    }
 }
 
 // HashMap
@@ -75,5 +78,8 @@ impl<K: DBusBasicType, V: DBusType> DBusType for HashMap<K, V> {
     }
     fn signature() -> String {
         <Dict<K, V>>::signature()
+    }
+    fn alignment() -> u8 {
+        8
     }
 }

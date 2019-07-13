@@ -15,6 +15,7 @@ mod tuple;
 pub trait DBusType {
     fn code() -> u8;
     fn signature() -> String;
+    fn alignment() -> u8;
 }
 
 impl<T: DBusType> DBusType for &T {
@@ -23,6 +24,9 @@ impl<T: DBusType> DBusType for &T {
     }
     fn signature() -> String {
         T::signature()
+    }
+    fn alignment() -> u8 {
+        T::alignment()
     }
 }
 

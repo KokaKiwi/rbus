@@ -22,12 +22,12 @@ macro_rules! impl_macro_input {
 
 #[proc_macro]
 pub fn impl_basic_type(item: TokenStream) -> TokenStream {
-    impl_macro_input!(types::impl_basic_type, item)
+    impl_macro_input!(?types::impl_basic_type, item)
 }
 
 #[proc_macro]
 pub fn impl_type(item: TokenStream) -> TokenStream {
-    impl_macro_input!(types::impl_type, item)
+    impl_macro_input!(?types::impl_type, item)
 }
 
 #[proc_macro_derive(DBusType, attributes(dbus))]

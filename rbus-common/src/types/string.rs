@@ -4,11 +4,11 @@ use rbus_derive::impl_type;
 // Basic strings
 // TODO: Validate strings? (according to DBus specs)
 impl_type! {
-    #[basic]
+    #[dbus(basic, align = 4)]
     str: 's'
 }
 impl_type! {
-    #[basic]
+    #[dbus(basic, align = 4)]
     String: 's'
 }
 
@@ -41,7 +41,7 @@ impl AsRef<str> for ObjectPath {
 }
 
 impl_type! {
-    #[basic]
+    #[dbus(basic, align = 4)]
     ObjectPath: 'o'
 }
 
@@ -74,6 +74,6 @@ impl AsRef<str> for Signature {
 }
 
 impl_type! {
-    #[basic]
+    #[dbus(basic)]
     Signature: 'g'
 }

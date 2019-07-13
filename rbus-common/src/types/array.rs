@@ -7,4 +7,7 @@ impl<T: DBusType> DBusType for Vec<T> {
     fn signature() -> String {
         format!("a{}", T::signature())
     }
+    fn alignment() -> u8 {
+        4
+    }
 }

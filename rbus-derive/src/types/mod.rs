@@ -1,8 +1,9 @@
-use crate::utils::attr::{parse_metas, Metas};
+use crate::utils::attr::{parse_named_metas, Metas};
 pub use basic::impl_basic_type;
 pub use derive::derive_type;
 use proc_macro::TokenStream;
 use syn::parse::{Parse, ParseStream, Result};
+use syn::spanned::Spanned;
 
 mod basic;
 mod derive;
@@ -16,7 +17,7 @@ pub struct TypeDef {
 impl Parse for TypeDef {
     fn parse(input: ParseStream) -> Result<Self> {
         let attrs = input.call(syn::Attribute::parse_outer)?;
-        let metas = parse_metas(attrs);
+        let metas = parse_named_metas(attrs, "dbus");
 
         let ty = input.parse()?;
         input.parse::<syn::Token![:]>()?;
@@ -26,21 +27,33 @@ impl Parse for TypeDef {
     }
 }
 
-pub fn impl_type(data: TypeDef) -> TokenStream {
-    let TypeDef {
-        ref ty, ref code, ..
-    } = data;
+pub fn impl_type(data: TypeDef) -> Result<TokenStream> {
+    let TypeDef { ty, code, metas } = data;
 
     let signature = format!("{}", code.value());
+    let alignment = match metas.find_meta_value("align")? {
+        Some(syn::Lit::Int(lit)) => quote::quote!(#lit as u8),
+        Some(syn::Lit::Str(lit)) if lit.value() == "size" => {
+            quote::quote!(std::mem::size_of::<Self>() as u8)
+        }
+        Some(lit) => {
+            return Err(syn::Error::new(
+                lit.span(),
+                "Bad align value, only integer or \"size\"",
+            ))
+        }
+        None => quote::quote!(1),
+    };
 
     let dbus_type_impl = quote::quote! {
         impl crate::types::DBusType for #ty {
             fn code() -> u8 { #code as u8 }
             fn signature() -> String { #signature.into() }
+            fn alignment() -> u8 { #alignment }
         }
     };
 
-    let basic_type_impl = if let Ok(true) = data.metas.find_meta_word("basic") {
+    let basic_type_impl = if let Ok(true) = metas.find_meta_word("basic") {
         quote::quote! {
             impl crate::types::DBusBasicType for #ty {}
         }
@@ -53,5 +66,5 @@ pub fn impl_type(data: TypeDef) -> TokenStream {
         #basic_type_impl
     };
 
-    tokens.into()
+    Ok(tokens.into())
 }

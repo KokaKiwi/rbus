@@ -12,19 +12,19 @@ impl Parse for BasicTypeDef {
         let attrs = input.call(syn::Attribute::parse_outer)?;
 
         let ty = input.parse()?;
-        input.parse::<syn::Token![,]>()?;
+        input.parse::<syn::Token![:]>()?;
         let code = input.parse()?;
 
         Ok(BasicTypeDef { attrs, ty, code })
     }
 }
 
-pub fn impl_basic_type(data: BasicTypeDef) -> TokenStream {
+pub fn impl_basic_type(data: BasicTypeDef) -> Result<TokenStream> {
     let BasicTypeDef { attrs, ty, code } = data;
 
     let tokens = quote::quote! {
         rbus_derive::impl_type! { #(#attrs)* #[basic] #ty: #code }
     };
 
-    tokens.into()
+    Ok(tokens.into())
 }
