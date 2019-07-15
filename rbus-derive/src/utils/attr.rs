@@ -2,7 +2,7 @@ use std::iter::FromIterator;
 use syn::parse::{Parse, ParseStream, Result};
 use syn::spanned::Spanned;
 
-pub struct Metas(Vec<syn::NestedMeta>);
+pub struct Metas(syn::AttributeArgs);
 
 #[allow(dead_code)]
 impl Metas {
@@ -114,13 +114,13 @@ impl FromIterator<syn::NestedMeta> for Metas {
     }
 }
 
-impl From<Vec<syn::NestedMeta>> for Metas {
+impl From<syn::AttributeArgs> for Metas {
     fn from(value: Vec<syn::NestedMeta>) -> Metas {
         Metas(value)
     }
 }
 
-impl From<Option<Vec<syn::NestedMeta>>> for Metas {
+impl From<Option<syn::AttributeArgs>> for Metas {
     fn from(value: Option<Vec<syn::NestedMeta>>) -> Metas {
         Metas(value.unwrap_or_else(Vec::new))
     }
