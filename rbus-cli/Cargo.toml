@@ -14,7 +14,6 @@ log = "*"
 log4rs = { version = "*", features = ["toml_format"] }
 paw = "*"
 rbus = "*"
-rbus-common = "*"
 serde = { version = "*", features = ["derive"] }
 structopt = { version = "*", features = ["paw"] }
 toml = "*"

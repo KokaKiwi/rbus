@@ -35,7 +35,6 @@ mod tests {
     #[test]
     fn test_signature_struct_packed() {
         #[derive(DBusType)]
-        #[dbus(type_path = "crate::types::DBusType")]
         struct Arg(u8, String);
 
         assert_eq!(<(u32, Arg)>::signature(), "u(ys)");

@@ -1,1 +1,1 @@
-pub use rbus_common::types;
+pub mod types;

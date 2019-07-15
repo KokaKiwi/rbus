@@ -13,14 +13,13 @@ pub struct DeriveTypeDef {
 impl DeriveTypeDef {
     fn impl_type(self) -> Result<TokenStream> {
         let name = &self.name;
-        let dbus_type_path = self.get_dbus_type_path()?;
         let generics = self.gen_generics()?;
         let body = self.gen_body()?;
 
         let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
         let tokens = quote::quote! {
-            impl #impl_generics #dbus_type_path for #name #ty_generics #where_clause {
+            impl #impl_generics DBusType for #name #ty_generics #where_clause {
                 #body
             }
         };
@@ -28,24 +27,13 @@ impl DeriveTypeDef {
         Ok(tokens)
     }
 
-    fn get_dbus_type_path(&self) -> Result<syn::Path> {
-        let type_path_value: syn::LitStr = self
-            .metas
-            .find_meta_value_str("type_path")?
-            .cloned()
-            .unwrap_or_else(|| syn::parse_quote!("rbus::types::DBusType"));
-        type_path_value.parse()
-    }
-
     fn gen_generics(&self) -> Result<syn::Generics> {
         let mut generics = self.generics.clone();
         if !generics.params.is_empty() || generics.where_clause.is_some() {
-            let dbus_type_path = self.get_dbus_type_path()?;
-
             let mut where_clause = generics.make_where_clause().clone();
             for type_param in generics.type_params() {
                 let name = &type_param.ident;
-                let predicate = syn::parse_quote! { #name: #dbus_type_path };
+                let predicate = syn::parse_quote! { #name: DBusType };
                 where_clause.predicates.push(predicate);
             }
 
