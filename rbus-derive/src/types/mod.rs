@@ -1,7 +1,7 @@
 use crate::utils::attr::Metas;
 pub use basic::impl_basic_type;
 pub use derive::derive_type;
-use proc_macro::TokenStream;
+use proc_macro2::TokenStream;
 use syn::parse::{Parse, ParseStream, Result};
 use syn::spanned::Spanned;
 
@@ -56,7 +56,7 @@ pub fn impl_type(data: TypeDef) -> Result<TokenStream> {
         }
     };
 
-    let basic_type_impl = if let Ok(true) = metas.find_meta_word("basic") {
+    let basic_type_impl = if let Ok(true) = metas.has_meta_word("basic") {
         quote::quote! {
             impl crate::types::DBusBasicType for #ty {}
         }
@@ -69,5 +69,5 @@ pub fn impl_type(data: TypeDef) -> Result<TokenStream> {
         #basic_type_impl
     };
 
-    Ok(tokens.into())
+    Ok(tokens)
 }

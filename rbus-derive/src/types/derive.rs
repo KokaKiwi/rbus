@@ -1,68 +1,74 @@
 use crate::utils::attr::{parse_named_metas, Metas};
-use proc_macro::TokenStream;
-use proc_macro2::Span;
+use proc_macro2::{Span, TokenStream};
 use syn::parse::{Parse, ParseStream, Result};
 
-pub enum DeriveTypeDef {
-    Struct(StructTypeDef),
-    Enum(EnumTypeDef),
+pub struct DeriveTypeDef {
+    span: Span,
+    metas: Metas,
+    name: syn::Ident,
+    generics: syn::Generics,
+    data: syn::Data,
 }
 
 impl DeriveTypeDef {
-    pub fn impl_type(self) -> Result<TokenStream> {
-        match self {
-            DeriveTypeDef::Struct(def) => def.impl_type(),
-            DeriveTypeDef::Enum(def) => def.impl_type(),
-        }
-    }
-}
-
-impl Parse for DeriveTypeDef {
-    fn parse(input: ParseStream) -> Result<Self> {
-        if let Ok(def) = input.parse() {
-            Ok(DeriveTypeDef::Struct(def))
-        } else if let Ok(def) = input.parse() {
-            Ok(DeriveTypeDef::Enum(def))
-        } else {
-            Err(input.error("DBusType can only be derive for struct or enum"))
-        }
-    }
-}
-
-pub struct StructTypeDef {
-    name: syn::Ident,
-    settings: Metas,
-    generics: syn::Generics,
-    fields: syn::Fields,
-}
-
-impl StructTypeDef {
     fn impl_type(self) -> Result<TokenStream> {
         let name = &self.name;
-
-        let rbus_module = self
-            .settings
-            .find_meta_value_str("module")?
-            .unwrap_or_else(|| "rbus_common".into());
-        let rbus_module = syn::Ident::new(rbus_module.as_str(), Span::call_site());
-        let dbus_type_path: syn::TraitBound = syn::parse_quote!(#rbus_module::types::DBusType);
-
-        // Add DBusType trait dep for generics if any
-        let mut generics = self.generics;
-        if !generics.params.is_empty() {
-            let type_param_bound = syn::TypeParamBound::Trait(dbus_type_path.clone());
-            generics
-                .type_params_mut()
-                .for_each(|type_param| type_param.bounds.push_value(type_param_bound.clone()));
-        }
+        let dbus_type_path = self.get_dbus_type_path()?;
+        let generics = self.gen_generics()?;
+        let body = self.gen_body()?;
 
         let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
-        let field_types = match self.fields {
-            syn::Fields::Named(fields) => {
+        let tokens = quote::quote! {
+            impl #impl_generics #dbus_type_path for #name #ty_generics #where_clause {
+                #body
+            }
+        };
+
+        Ok(tokens)
+    }
+
+    fn get_dbus_type_path(&self) -> Result<syn::Path> {
+        let type_path_value: syn::LitStr = self
+            .metas
+            .find_meta_value_str("type_path")?
+            .cloned()
+            .unwrap_or_else(|| syn::parse_quote!("rbus::types::DBusType"));
+        type_path_value.parse()
+    }
+
+    fn gen_generics(&self) -> Result<syn::Generics> {
+        let mut generics = self.generics.clone();
+        if !generics.params.is_empty() || generics.where_clause.is_some() {
+            let dbus_type_path = self.get_dbus_type_path()?;
+
+            let mut where_clause = generics.make_where_clause().clone();
+            for type_param in generics.type_params() {
+                let name = &type_param.ident;
+                let predicate = syn::parse_quote! { #name: #dbus_type_path };
+                where_clause.predicates.push(predicate);
+            }
+
+            generics.where_clause = Some(where_clause);
+        }
+
+        Ok(generics)
+    }
+
+    fn gen_body(&self) -> Result<TokenStream> {
+        match self.data {
+            syn::Data::Struct(ref data) => self.gen_struct_body(data),
+            syn::Data::Enum(ref data) => self.gen_enum_body(data),
+            syn::Data::Union(_) => Err(syn::Error::new(self.span, "Union are not supported")),
+        }
+    }
+
+    fn gen_struct_body(&self, data: &syn::DataStruct) -> Result<TokenStream> {
+        let field_types = match data.fields {
+            syn::Fields::Named(ref fields) => {
                 fields.named.iter().map(|field| field.ty.clone()).collect()
             }
-            syn::Fields::Unnamed(fields) => fields
+            syn::Fields::Unnamed(ref fields) => fields
                 .unnamed
                 .iter()
                 .map(|field| field.ty.clone())
@@ -70,87 +76,43 @@ impl StructTypeDef {
             syn::Fields::Unit => Vec::new(),
         };
 
-        let format_str = format!("({})", "{}".repeat(field_types.len()));
+        let signature_format_str = format!("({})", "{}".repeat(field_types.len()));
 
-        let tokens = quote::quote! {
-            impl #impl_generics #dbus_type_path for #name #ty_generics #where_clause {
-                fn code() -> u8 { b'r' }
-                fn signature() -> String { format!(#format_str, #(<#field_types>::signature()),*) }
-                fn alignment() -> u8 { 8 }
+        let body = quote::quote! {
+            fn code() -> u8 { b'r' }
+            fn signature() -> String {
+                format!(#signature_format_str, #(<#field_types>::signature()),*)
             }
+            fn alignment() -> u8 { 8 }
         };
 
-        Ok(tokens.into())
+        Ok(body)
     }
-}
 
-impl Parse for StructTypeDef {
-    fn parse(input: ParseStream) -> Result<Self> {
-        let item = input.parse::<syn::ItemStruct>()?;
-
-        let settings = parse_named_metas(item.attrs, "dbus");
-
-        Ok(StructTypeDef {
-            name: item.ident,
-            settings,
-            generics: item.generics,
-            fields: item.fields,
-        })
-    }
-}
-
-pub struct EnumTypeDef {
-    name: syn::Ident,
-    settings: Metas,
-    generics: syn::Generics,
-    #[allow(dead_code)]
-    variants: syn::punctuated::Punctuated<syn::Variant, syn::Token![,]>,
-}
-
-impl EnumTypeDef {
-    fn impl_type(self) -> Result<TokenStream> {
-        let name = &self.name;
-
-        let rbus_module = self
-            .settings
-            .find_meta_value_str("module")?
-            .unwrap_or_else(|| "rbus_common".into());
-        let rbus_module = syn::Ident::new(rbus_module.as_str(), Span::call_site());
-        let dbus_type_path: syn::TraitBound = syn::parse_quote!(#rbus_module::types::DBusType);
-
-        // Add DBusType trait dep for generics if any
-        let mut generics = self.generics;
-        if !generics.params.is_empty() {
-            let type_param_bound = syn::TypeParamBound::Trait(dbus_type_path.clone());
-            generics
-                .type_params_mut()
-                .for_each(|type_param| type_param.bounds.push_value(type_param_bound.clone()));
-        }
-
-        let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
-        let tokens = quote::quote! {
-            impl #impl_generics #dbus_type_path for #name #ty_generics #where_clause {
-                fn code() -> u8 { b'v' }
-                fn signature() -> String { "v" }
-                fn alignment() -> u8 { 1 }
-            }
+    fn gen_enum_body(&self, _data: &syn::DataEnum) -> Result<TokenStream> {
+        let body = quote::quote! {
+            fn code() -> u8 { b'v' }
+            fn signature() -> String { "v".into() }
+            fn alignment() -> u8 { 1 }
         };
 
-        Ok(tokens.into())
+        Ok(body)
     }
 }
 
-impl Parse for EnumTypeDef {
+impl Parse for DeriveTypeDef {
     fn parse(input: ParseStream) -> Result<Self> {
-        let item = input.parse::<syn::ItemEnum>()?;
+        use syn::spanned::Spanned;
 
-        let settings = parse_named_metas(item.attrs, "dbus");
+        let derive_input = input.parse::<syn::DeriveInput>()?;
+        let metas = parse_named_metas(&derive_input.attrs, "dbus");
 
-        Ok(EnumTypeDef {
-            name: item.ident,
-            settings,
-            generics: item.generics,
-            variants: item.variants,
+        Ok(DeriveTypeDef {
+            span: derive_input.span(),
+            metas,
+            name: derive_input.ident,
+            generics: derive_input.generics,
+            data: derive_input.data,
         })
     }
 }

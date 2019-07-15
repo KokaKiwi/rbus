@@ -33,7 +33,7 @@ impl Metas {
             .collect()
     }
 
-    pub fn find_meta_word(&self, name: &str) -> Result<bool> {
+    pub fn has_meta_word(&self, name: &str) -> Result<bool> {
         match self.find_meta(name) {
             Some(syn::Meta::Word(_)) => Ok(true),
             Some(meta) => Err(syn::Error::new(
@@ -57,7 +57,7 @@ impl Metas {
             .collect()
     }
 
-    pub fn find_meta_value<'a>(&'a self, name: &str) -> Result<Option<&'a syn::Lit>> {
+    pub fn find_meta_value(&self, name: &str) -> Result<Option<&syn::Lit>> {
         match self.find_meta(name) {
             Some(syn::Meta::NameValue(meta)) => Ok(Some(&meta.lit)),
             Some(meta) => Err(syn::Error::new(
@@ -68,9 +68,9 @@ impl Metas {
         }
     }
 
-    pub fn find_meta_value_str(&self, name: &str) -> Result<Option<String>> {
+    pub fn find_meta_value_str(&self, name: &str) -> Result<Option<&syn::LitStr>> {
         self.find_meta_value(name).and_then(|value| match value {
-            Some(syn::Lit::Str(lit)) => Ok(Some(lit.value())),
+            Some(syn::Lit::Str(lit)) => Ok(Some(lit)),
             Some(meta) => Err(syn::Error::new(
                 meta.span(),
                 format!("Expected string value: `{}`", name),
@@ -79,9 +79,9 @@ impl Metas {
         })
     }
 
-    pub fn find_meta_value_int(&self, name: &str) -> Result<Option<u64>> {
+    pub fn find_meta_value_int(&self, name: &str) -> Result<Option<&syn::LitInt>> {
         self.find_meta_value(name).and_then(|value| match value {
-            Some(syn::Lit::Int(lit)) => Ok(Some(lit.value())),
+            Some(syn::Lit::Int(lit)) => Ok(Some(lit)),
             Some(meta) => Err(syn::Error::new(
                 meta.span(),
                 format!("Expected int value: `{}`", name),
@@ -132,13 +132,20 @@ impl Parse for Metas {
     }
 }
 
-pub fn parse_named_metas(attrs: Vec<syn::Attribute>, name: &str) -> Metas {
+pub fn parse_named_metas<T>(attrs: T, name: &str) -> Metas
+where
+    T: AsRef<[syn::Attribute]>,
+{
     parse_metas(attrs).find_meta_nested(name)
 }
 
-pub fn parse_metas(attrs: Vec<syn::Attribute>) -> Metas {
+pub fn parse_metas<T>(attrs: T) -> Metas
+where
+    T: AsRef<[syn::Attribute]>,
+{
     attrs
-        .into_iter()
+        .as_ref()
+        .iter()
         .filter_map(|attr| attr.parse_meta().ok()) // TODO: Don't silently ignore errors.
         .map(syn::NestedMeta::Meta)
         .collect()

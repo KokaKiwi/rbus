@@ -13,7 +13,7 @@ macro_rules! impl_macro_input {
     ($fun:path, $($arg:ident),*) => ( impl_macro_input!($fun, $($arg: _),*) );
     (? $fun:path, $($arg:ident: $ty:ty),*) => {
         match $fun($(parse_macro_input!($arg as $ty)),*) {
-            Ok(data) => data,
+            Ok(data) => data.into(),
             Err(err) => err.to_compile_error().into(),
         }
     };
