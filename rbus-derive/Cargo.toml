@@ -8,6 +8,7 @@ edition = "2018"
 proc-macro = true
 
 [dependencies]
+backtrace = "*"
 proc-macro2 = "*"
 quote = "*"
 syn = { version = "*", features = ["full"] }
