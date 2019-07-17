@@ -1,15 +1,12 @@
 use custom_error::custom_error;
 use rbus_derive::impl_type;
+use std::borrow::Cow;
 
 // Basic strings
 // TODO: Validate strings? (according to DBus specs)
 impl_type! {
     #[dbus(basic, align = 4)]
-    str: 's'
-}
-impl_type! {
-    #[dbus(basic, align = 4)]
-    String: 's'
+    Cow<'_, str>: 's'
 }
 
 // Object path

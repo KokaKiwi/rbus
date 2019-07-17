@@ -2,6 +2,7 @@ use std::iter::FromIterator;
 use syn::parse::{Parse, ParseStream, Result};
 use syn::spanned::Spanned;
 
+#[derive(Debug, Clone, PartialEq)]
 pub struct Metas(syn::AttributeArgs);
 
 #[allow(dead_code)]
@@ -128,25 +129,27 @@ impl From<Option<syn::AttributeArgs>> for Metas {
 
 impl Parse for Metas {
     fn parse(input: ParseStream) -> Result<Self> {
-        input.call(syn::Attribute::parse_outer).map(parse_metas)
+        input
+            .call(syn::Attribute::parse_outer)
+            .and_then(parse_metas)
     }
 }
 
-pub fn parse_named_metas<T>(attrs: T, name: &str) -> Metas
+pub fn parse_named_metas<T>(attrs: T, name: &str) -> Result<Metas>
 where
     T: AsRef<[syn::Attribute]>,
 {
-    parse_metas(attrs).find_meta_nested(name)
+    Ok(parse_metas(attrs)?.find_meta_nested(name))
 }
 
-pub fn parse_metas<T>(attrs: T) -> Metas
+pub fn parse_metas<T>(attrs: T) -> Result<Metas>
 where
     T: AsRef<[syn::Attribute]>,
 {
     attrs
         .as_ref()
         .iter()
-        .filter_map(|attr| attr.parse_meta().ok()) // TODO: Don't silently ignore errors.
-        .map(syn::NestedMeta::Meta)
+        .map(syn::Attribute::parse_meta)
+        .map(|meta| meta.map(syn::NestedMeta::Meta))
         .collect()
 }

@@ -8,7 +8,7 @@ edition = "2018"
 crate-type = ["lib", "staticlib", "cdylib"]
 
 [dependencies]
-byteorder = "*"
+byteordered = "*"
 custom_error = "*"
 rbus-derive = "*"
 

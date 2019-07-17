@@ -1,9 +1,10 @@
-use crate::utils::attr::{parse_named_metas, Metas};
+use crate::utils::{parse_named_metas, Metas};
 use proc_macro2::{Span, TokenStream};
 use syn::parse::{Parse, ParseStream, Result};
 
 pub struct DeriveTypeDef {
     span: Span,
+    #[allow(dead_code)]
     metas: Metas,
     name: syn::Ident,
     generics: syn::Generics,
@@ -93,7 +94,7 @@ impl Parse for DeriveTypeDef {
         use syn::spanned::Spanned;
 
         let derive_input = input.parse::<syn::DeriveInput>()?;
-        let metas = parse_named_metas(&derive_input.attrs, "dbus");
+        let metas = parse_named_metas(&derive_input.attrs, "dbus")?;
 
         Ok(DeriveTypeDef {
             span: derive_input.span(),

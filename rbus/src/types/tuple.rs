@@ -1,7 +1,11 @@
 use super::DBusType;
-
-pub trait DBusPackedTypes {
+use crate::marshal::Marshaller;
+use std::io;
+pub trait DBusPackedTypes: Sized {
     fn signature() -> String;
+
+    fn encode<T: AsRef<[u8]> + io::Write>(&self, marshaller: &mut Marshaller<T>) -> io::Result<()>;
+    fn decode<T: AsRef<[u8]> + io::Read>(marshaller: &mut Marshaller<T>) -> io::Result<Self>;
 }
 
 macro_rules! impl_tuple_type {
@@ -10,18 +14,27 @@ macro_rules! impl_tuple_type {
             fn signature() -> String {
                 [$($ty::signature()),*].concat()
             }
+
+            fn encode<T: AsRef<[u8]> + io::Write>(&self, marshaller: &mut Marshaller<T>) -> io::Result<()> {
+                $(self.$index.encode(marshaller)?;)*
+                Ok(())
+            }
+
+            fn decode<T: AsRef<[u8]> + io::Read>(marshaller: &mut Marshaller<T>) -> io::Result<Self> {
+                Ok(($($ty::decode(marshaller)?),*,))
+            }
         }
     }
 }
 
 impl_tuple_type!(0: A);
 impl_tuple_type!(0: A, 1: B);
-impl_tuple_type!(0: A, 2: B, 3: C);
-impl_tuple_type!(0: A, 2: B, 3: C, 4: D);
-impl_tuple_type!(0: A, 2: B, 3: C, 4: D, 5: E);
-impl_tuple_type!(0: A, 2: B, 3: C, 4: D, 5: E, 6: F);
-impl_tuple_type!(0: A, 2: B, 3: C, 4: D, 5: E, 6: F, 7: G);
-impl_tuple_type!(0: A, 2: B, 3: C, 4: D, 5: E, 6: F, 7: G, 8: H);
+impl_tuple_type!(0: A, 1: B, 2: C);
+impl_tuple_type!(0: A, 1: B, 2: C, 3: D);
+impl_tuple_type!(0: A, 1: B, 2: C, 3: D, 4: E);
+impl_tuple_type!(0: A, 1: B, 2: C, 3: D, 4: E, 5: F);
+impl_tuple_type!(0: A, 1: B, 2: C, 3: D, 4: E, 5: F, 6: G);
+impl_tuple_type!(0: A, 1: B, 2: C, 3: D, 4: E, 5: F, 6: G, 7: H);
 
 #[cfg(test)]
 mod tests {
