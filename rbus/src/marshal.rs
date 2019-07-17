@@ -9,10 +9,7 @@ pub struct Marshaller<T> {
 
 impl<T> Marshaller<T> {
     pub fn new(inner: T, endianness: Endianness) -> Marshaller<T> {
-        Marshaller {
-            inner,
-            endianness,
-        }
+        Marshaller { inner, endianness }
     }
 
     pub fn io(&mut self) -> ByteOrdered<&mut T, Endianness> {
