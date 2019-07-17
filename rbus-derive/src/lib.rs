@@ -11,6 +11,7 @@ macro_rules! impl_macro_input {
         $fun($(parse_macro_input!($arg as $ty)),*)
     };
     ($fun:path, $($arg:ident),*) => ( impl_macro_input!($fun, $($arg: _),*) );
+
     (? $fun:path, $($arg:ident: $ty:ty),*) => {
         match $fun($(parse_macro_input!($arg as $ty)),*) {
             Ok(data) => data.into(),
