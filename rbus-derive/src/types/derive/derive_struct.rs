@@ -1,8 +1,8 @@
 use super::DeriveTypeDef;
-use crate::utils::{split_tuples, DBusMetas};
+use super::Fields;
+use crate::utils::DBusMetas;
 use proc_macro2::TokenStream;
 use syn::parse::Result;
-use syn::spanned::Spanned;
 
 #[derive(Debug, Clone)]
 pub struct DeriveStruct {
@@ -68,7 +68,7 @@ impl DeriveStruct {
 
         let tokens = match self.fields {
             Fields::Named(ref fields) => {
-                let (names, types) = split_tuples(&fields);
+                let (names, types) = Fields::split_named(&fields);
 
                 quote::quote! {
                     fn decode<Inner>(marshaller: &mut #rbus_module::marshal::Marshaller<Inner>) -> #rbus_module::Result<Self>
@@ -85,7 +85,7 @@ impl DeriveStruct {
                 }
             }
             Fields::Unnamed(ref fields) => {
-                let types = fields.iter().map(|(_, ty)| ty);
+                let types = fields.iter().map(|field| &field.ty);
 
                 quote::quote! {
                     fn decode<Inner>(marshaller: &mut #rbus_module::marshal::Marshaller<Inner>) -> #rbus_module::Result<Self>
@@ -117,59 +117,6 @@ impl From<syn::DataStruct> for DeriveStruct {
     fn from(data: syn::DataStruct) -> Self {
         DeriveStruct {
             fields: data.fields.into(),
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub enum Fields {
-    Named(Vec<(syn::Ident, syn::Type)>),
-    Unnamed(Vec<(syn::LitInt, syn::Type)>),
-    Unit,
-}
-
-impl Fields {
-    fn to_vec(&self) -> Vec<(TokenStream, &syn::Type)> {
-        match self {
-            Fields::Named(fields) => fields
-                .iter()
-                .map(|(name, ty)| (quote::quote!(#name), ty))
-                .collect(),
-            Fields::Unnamed(fields) => fields
-                .iter()
-                .map(|(pos, ty)| (quote::quote!(#pos), ty))
-                .collect(),
-            Fields::Unit => Vec::new(),
-        }
-    }
-}
-
-impl From<syn::Fields> for Fields {
-    fn from(fields: syn::Fields) -> Fields {
-        match fields {
-            syn::Fields::Named(fields) => {
-                let fields = fields
-                    .named
-                    .iter()
-                    .map(|field| (field.ident.clone().unwrap(), field.ty.clone()))
-                    .collect();
-
-                Fields::Named(fields)
-            }
-            syn::Fields::Unnamed(fields) => {
-                let fields = fields
-                    .unnamed
-                    .iter()
-                    .enumerate()
-                    .map(|(pos, field)| {
-                        let pos = syn::LitInt::new(pos as u64, syn::IntSuffix::None, field.span());
-                        (pos, field.ty.clone())
-                    })
-                    .collect();
-
-                Fields::Unnamed(fields)
-            }
-            syn::Fields::Unit => Fields::Unit,
         }
     }
 }

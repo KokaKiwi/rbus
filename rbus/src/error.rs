@@ -1,3 +1,4 @@
+use crate::types::{ObjectPathError, SignatureError};
 use custom_error::custom_error;
 use std::io;
 
@@ -9,6 +10,10 @@ custom_error! {
             = "I/O error: {source}",
         FromUtf8 { source: std::string::FromUtf8Error }
             = "UTF-8 decoding error: {source}",
+        Signature { source: SignatureError }
+            = "Signature error: {source}",
+        ObjectPath { source: ObjectPathError }
+            = "Object path error: {source}",
         Custom { message: String }
             = "{message}",
         Unknown

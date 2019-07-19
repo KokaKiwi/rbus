@@ -1,11 +1,16 @@
 use crate::utils::{parse_named_metas, Metas};
-use derive_enum::DeriveEnum;
-use derive_struct::DeriveStruct;
+use derive_enum::*;
+use derive_struct::*;
+pub use fields::*;
 use proc_macro2::{Span, TokenStream};
+use std::convert::{TryFrom, TryInto};
 use syn::parse::{Parse, ParseStream, Result};
+pub use variants::*;
 
 mod derive_enum;
 mod derive_struct;
+mod fields;
+mod variants;
 
 #[derive(Debug, Clone)]
 pub struct DeriveTypeDef {
@@ -32,15 +37,22 @@ impl DeriveData {
     }
 }
 
-impl DeriveData {
-    fn from(data: syn::Data) -> Option<DeriveData> {
+impl TryFrom<syn::Data> for DeriveData {
+    type Error = syn::Error;
+
+    fn try_from(data: syn::Data) -> Result<DeriveData> {
         let data = match data {
-            syn::Data::Enum(data) => DeriveData::Enum(data.into()),
+            syn::Data::Enum(data) => DeriveData::Enum(data.try_into()?),
             syn::Data::Struct(data) => DeriveData::Struct(data.into()),
-            _ => return None,
+            _ => {
+                return Err(syn::Error::new(
+                    Span::call_site(),
+                    "Data not supported for derive",
+                ))
+            }
         };
 
-        Some(data)
+        Ok(data)
     }
 }
 
@@ -85,8 +97,7 @@ impl Parse for DeriveTypeDef {
         let derive_input = input.parse::<syn::DeriveInput>()?;
         let span = derive_input.span();
         let metas = parse_named_metas(&derive_input.attrs, "dbus")?;
-        let data = DeriveData::from(derive_input.data)
-            .ok_or_else(|| syn::Error::new(span, "Unsupported type for derive DBusType"))?;
+        let data = DeriveData::try_from(derive_input.data)?;
 
         Ok(DeriveTypeDef {
             span,
