@@ -4,7 +4,3 @@ members = [
     "rbus",
     "rbus-cli",
 ]
-
-[patch.crates-io]
-rbus = { path = "rbus" }
-rbus-derive = { path = "rbus-derive" }

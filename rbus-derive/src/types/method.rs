@@ -65,13 +65,15 @@ impl Method {
             .map(|pair| pair.into_value())
             .ok_or_else(|| Error::new(args.span(), "Not enough arguments"))?;
 
-        let rbus_module = metas.find_rbus_module()?;
+        let rbus_module = metas.find_rbus_module("crate")?;
 
         let tokens = quote::quote! {
-            fn encode<T>(&self, #marshaller: &mut #rbus_module::marshal::Marshaller<T>) -> std::io::Result<()>
+            fn encode<Inner>(&self, #marshaller: &mut #rbus_module::marshal::Marshaller<Inner>) -> #rbus_module::Result<()>
             where
-                T: AsRef<[u8]> + std::io::Write
+                Inner: AsRef<[u8]> + std::io::Write
             {
+                use std::io::Write;
+
                 #body
             }
         };
@@ -86,13 +88,14 @@ impl Method {
             .map(|pair| pair.into_value())
             .ok_or_else(|| Error::new(args.span(), "Not enough arguments"))?;
 
-        let rbus_module = metas.find_rbus_module()?;
+        let rbus_module = metas.find_rbus_module("crate")?;
 
         let tokens = quote::quote! {
-            fn decode<T>(#marshaller: &mut #rbus_module::marshal::Marshaller<T>) -> std::io::Result<Self>
+            fn decode<Inner>(#marshaller: &mut #rbus_module::marshal::Marshaller<Inner>) -> #rbus_module::Result<Self>
             where
-                T: AsRef<[u8]> + std::io::Read
+                Inner: AsRef<[u8]> + std::io::Read
             {
+                use std::io::Read;
                 #body
             }
         };

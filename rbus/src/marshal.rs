@@ -1,4 +1,5 @@
 use crate::types::{DBusPackedTypes, DBusType};
+use crate::Result;
 use byteordered::{ByteOrdered, Endianness};
 use std::io;
 
@@ -18,8 +19,22 @@ impl<T> Marshaller<T> {
 }
 
 impl<T: AsRef<[u8]>> Marshaller<T> {
-    fn len(&self) -> usize {
-        self.inner.as_ref().len()
+    pub fn to_slice(&self) -> &[u8] {
+        self.inner.as_ref()
+    }
+
+    pub fn len(&self) -> usize {
+        self.to_slice().len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+}
+
+impl Marshaller<Vec<u8>> {
+    pub fn into_vec(self) -> Vec<u8> {
+        self.inner
     }
 }
 
@@ -33,14 +48,13 @@ where
         Ok(())
     }
 
-    pub fn write_value<U: DBusType>(&mut self, value: U) -> io::Result<()> {
+    pub fn write_value<U: DBusType>(&mut self, value: &U) -> Result<()> {
         self.write_padding(U::alignment())?;
-        value.encode(self)?;
-        Ok(())
+        value.encode(self)
     }
 
-    pub fn write_packed<U: DBusPackedTypes>(&mut self, value: U) -> io::Result<()> {
-        unimplemented!()
+    pub fn write_packed<U: DBusPackedTypes>(&mut self, value: U) -> Result<()> {
+        value.encode(self)
     }
 }
 
@@ -56,13 +70,12 @@ where
         Ok(padding_len)
     }
 
-    pub fn read_value<U: DBusType>(&mut self) -> io::Result<U> {
+    pub fn read_value<U: DBusType>(&mut self) -> Result<U> {
         self.read_padding(U::alignment())?;
-        let value = U::decode(self)?;
-        Ok(value)
+        U::decode(self)
     }
 
-    pub fn read_packed<U: DBusPackedTypes>(&mut self) -> io::Result<U> {
-        unimplemented!()
+    pub fn read_packed<U: DBusPackedTypes>(&mut self) -> Result<U> {
+        U::decode(self)
     }
 }

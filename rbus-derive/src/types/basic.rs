@@ -46,8 +46,7 @@ impl BasicTypeDef {
 
         let tokens = quote::quote! {
             encode(marshaller) {
-                marshaller.io().#write_method(*self)?;
-                Ok(())
+                Ok(marshaller.io().#write_method(*self)?)
             }
         };
 
@@ -63,7 +62,7 @@ impl BasicTypeDef {
 
         let tokens = quote::quote! {
             decode(marshaller) {
-                marshaller.io().#read_method()
+                Ok(marshaller.io().#read_method()?)
             }
         };
 

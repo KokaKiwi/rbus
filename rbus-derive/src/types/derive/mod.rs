@@ -1,21 +1,54 @@
 use crate::utils::{parse_named_metas, Metas};
+use derive_enum::DeriveEnum;
+use derive_struct::DeriveStruct;
 use proc_macro2::{Span, TokenStream};
 use syn::parse::{Parse, ParseStream, Result};
 
+mod derive_enum;
+mod derive_struct;
+
+#[derive(Debug, Clone)]
 pub struct DeriveTypeDef {
-    span: Span,
+    pub span: Span,
     #[allow(dead_code)]
-    metas: Metas,
-    name: syn::Ident,
-    generics: syn::Generics,
-    data: syn::Data,
+    pub metas: Metas,
+    pub name: syn::Ident,
+    pub generics: syn::Generics,
+    pub data: DeriveData,
+}
+
+#[derive(Debug, Clone)]
+pub enum DeriveData {
+    Enum(DeriveEnum),
+    Struct(DeriveStruct),
+}
+
+impl DeriveData {
+    fn gen_body(&self, ty: &DeriveTypeDef) -> Result<TokenStream> {
+        match self {
+            DeriveData::Enum(ref data) => data.gen_body(ty),
+            DeriveData::Struct(ref data) => data.gen_body(ty),
+        }
+    }
+}
+
+impl DeriveData {
+    fn from(data: syn::Data) -> Option<DeriveData> {
+        let data = match data {
+            syn::Data::Enum(data) => DeriveData::Enum(data.into()),
+            syn::Data::Struct(data) => DeriveData::Struct(data.into()),
+            _ => return None,
+        };
+
+        Some(data)
+    }
 }
 
 impl DeriveTypeDef {
     fn impl_type(self) -> Result<TokenStream> {
         let name = &self.name;
         let generics = self.gen_generics()?;
-        let body = self.gen_body()?;
+        let body = self.data.gen_body(&self)?;
 
         let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
@@ -43,50 +76,6 @@ impl DeriveTypeDef {
 
         Ok(generics)
     }
-
-    fn gen_body(&self) -> Result<TokenStream> {
-        match self.data {
-            syn::Data::Struct(ref data) => self.gen_struct_body(data),
-            syn::Data::Enum(ref data) => self.gen_enum_body(data),
-            syn::Data::Union(_) => Err(syn::Error::new(self.span, "Union are not supported")),
-        }
-    }
-
-    fn gen_struct_body(&self, data: &syn::DataStruct) -> Result<TokenStream> {
-        let field_types = match data.fields {
-            syn::Fields::Named(ref fields) => {
-                fields.named.iter().map(|field| field.ty.clone()).collect()
-            }
-            syn::Fields::Unnamed(ref fields) => fields
-                .unnamed
-                .iter()
-                .map(|field| field.ty.clone())
-                .collect(),
-            syn::Fields::Unit => Vec::new(),
-        };
-
-        let signature_format_str = format!("({})", "{}".repeat(field_types.len()));
-
-        let body = quote::quote! {
-            fn code() -> u8 { b'r' }
-            fn signature() -> String {
-                format!(#signature_format_str, #(<#field_types>::signature()),*)
-            }
-            fn alignment() -> u8 { 8 }
-        };
-
-        Ok(body)
-    }
-
-    fn gen_enum_body(&self, _data: &syn::DataEnum) -> Result<TokenStream> {
-        let body = quote::quote! {
-            fn code() -> u8 { b'v' }
-            fn signature() -> String { "v".into() }
-            fn alignment() -> u8 { 1 }
-        };
-
-        Ok(body)
-    }
 }
 
 impl Parse for DeriveTypeDef {
@@ -94,14 +83,17 @@ impl Parse for DeriveTypeDef {
         use syn::spanned::Spanned;
 
         let derive_input = input.parse::<syn::DeriveInput>()?;
+        let span = derive_input.span();
         let metas = parse_named_metas(&derive_input.attrs, "dbus")?;
+        let data = DeriveData::from(derive_input.data)
+            .ok_or_else(|| syn::Error::new(span, "Unsupported type for derive DBusType"))?;
 
         Ok(DeriveTypeDef {
-            span: derive_input.span(),
+            span,
             metas,
             name: derive_input.ident,
             generics: derive_input.generics,
-            data: derive_input.data,
+            data,
         })
     }
 }

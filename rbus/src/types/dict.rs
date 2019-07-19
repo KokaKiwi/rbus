@@ -1,6 +1,8 @@
 use super::{DBusBasicType, DBusType};
+use rbus_derive::impl_type;
 use std::collections::HashMap;
 use std::hash::Hash;
+use std::iter::FromIterator;
 use std::ops::Deref;
 
 // Dict (list of dict entries)
@@ -59,27 +61,88 @@ impl<K, V> From<Vec<(K, V)>> for Dict<K, V> {
     }
 }
 
-impl<K: DBusBasicType, V: DBusType> DBusType for Dict<K, V> {
-    fn code() -> u8 {
-        b'e'
+impl<K, V> FromIterator<DictEntry<K, V>> for Dict<K, V> {
+    fn from_iter<T>(iter: T) -> Self
+    where
+        T: IntoIterator<Item = DictEntry<K, V>>,
+    {
+        iter.into_iter().collect::<Vec<_>>().into()
     }
-    fn signature() -> String {
-        format!("a{{{}{}}}", K::signature(), V::signature())
+}
+
+impl<K, V> FromIterator<(K, V)> for Dict<K, V> {
+    fn from_iter<T>(iter: T) -> Self
+    where
+        T: IntoIterator<Item = (K, V)>,
+    {
+        iter.into_iter().collect::<Vec<_>>().into()
     }
-    fn alignment() -> u8 {
-        8
+}
+
+impl_type! {
+    #[dbus(align = 8)]
+    impl<K: DBusBasicType, V: DBusType> DictEntry<K, V>: 'e' {
+        signature() {
+            format!("{{{}{}}}", K::signature(), V::signature())
+        }
+
+        encode(marshaller) {
+            marshaller.write_padding(Self::alignment())?;
+            marshaller.write_value(&self.0)?;
+            marshaller.write_padding(Self::alignment())?;
+            marshaller.write_value(&self.1)?;
+            Ok(())
+        }
+
+        decode(marshaller) {
+            marshaller.read_padding(Self::alignment())?;
+            let key = marshaller.read_value()?;
+            marshaller.read_padding(Self::alignment())?;
+            let value = marshaller.read_value()?;
+
+            Ok(DictEntry(key, value))
+        }
+    }
+}
+
+impl_type! {
+    #[dbus(align = 8)]
+    impl<K: DBusBasicType, V: DBusType> Dict<K, V>: 'e' {
+        signature() {
+            <Vec<DictEntry<K, V>>>::signature()
+        }
+
+        encode(marshaller) {
+            self.0.encode(marshaller)
+        }
+
+        decode(marshaller) {
+            let values = <Vec<DictEntry<K, V>>>::decode(marshaller)?;
+            Ok(Dict(values))
+        }
     }
 }
 
 // HashMap
-impl<K: DBusBasicType, V: DBusType, S: std::hash::BuildHasher> DBusType for HashMap<K, V, S> {
-    fn code() -> u8 {
-        b'e'
-    }
-    fn signature() -> String {
-        <Dict<K, V>>::signature()
-    }
-    fn alignment() -> u8 {
-        8
+impl_type! {
+    #[dbus(align = 8)]
+    impl<K, V> HashMap<K, V>: 'e'
+    where
+        K: DBusBasicType + Eq + Hash,
+        V: DBusType,
+    {
+        signature() {
+            <Dict<K, V>>::signature()
+        }
+
+        encode(marshaller) {
+            let data = self.iter().collect::<Dict<_, _>>();
+            data.encode(marshaller)
+        }
+
+        decode(marshaller) {
+            let dict = <Dict<_, _>>::decode(marshaller)?;
+            Ok(dict.into_hashmap())
+        }
     }
 }

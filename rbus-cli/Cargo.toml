@@ -13,7 +13,7 @@ custom_error = "*"
 log = "*"
 log4rs = { version = "*", features = ["toml_format"] }
 paw = "*"
-rbus = "*"
+rbus = { version = "*", path = "../rbus" }
 serde = { version = "*", features = ["derive"] }
 structopt = { version = "*", features = ["paw"] }
 toml = "*"

@@ -1,11 +1,11 @@
 use rbus_derive::impl_basic_type;
 
 impl_basic_type! {
-    #[dbus(align = "size", module = "crate")]
+    #[dbus(align = "size")]
     u8: 'y'
 }
 impl_basic_type! {
-    #[dbus(align = 4, module = "crate")]
+    #[dbus(align = 4)]
     bool: 'b' {
         encode(marshaller) {
             marshaller.io().write_u32(*self as u32)?;
@@ -19,31 +19,31 @@ impl_basic_type! {
     }
 }
 impl_basic_type! {
-    #[dbus(align = "size", module = "crate")]
+    #[dbus(align = "size")]
     i16: 'n'
 }
 impl_basic_type! {
-    #[dbus(align = "size", module = "crate")]
+    #[dbus(align = "size")]
     u16: 'q'
 }
 impl_basic_type! {
-    #[dbus(align = "size", module = "crate")]
+    #[dbus(align = "size")]
     i32: 'i'
 }
 impl_basic_type! {
-    #[dbus(align = "size", module = "crate")]
+    #[dbus(align = "size")]
     u32: 'u'
 }
 impl_basic_type! {
-    #[dbus(align = "size", module = "crate")]
+    #[dbus(align = "size")]
     i64: 'x'
 }
 impl_basic_type! {
-    #[dbus(align = "size", module = "crate")]
+    #[dbus(align = "size")]
     u64: 't'
 }
 impl_basic_type! {
-    #[dbus(align = "size", module = "crate")]
+    #[dbus(align = "size")]
     f64: 'd'
 }
 
@@ -52,10 +52,10 @@ impl_basic_type! {
 pub struct UnixFd(pub u32);
 
 impl_basic_type! {
-    #[dbus(align = "size", module = "crate")]
+    #[dbus(align = 4)]
     UnixFd: 'h' {
         encode(marshaller) {
-            marshaller.io().write_u32(self.0);
+            marshaller.io().write_u32(self.0)?;
             Ok(())
         }
 

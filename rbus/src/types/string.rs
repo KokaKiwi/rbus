@@ -1,12 +1,44 @@
 use custom_error::custom_error;
 use rbus_derive::impl_type;
-use std::borrow::Cow;
 
 // Basic strings
 // TODO: Validate strings? (according to DBus specs)
 impl_type! {
     #[dbus(basic, align = 4)]
-    Cow<'_, str>: 's'
+    &str: 's' {
+        encode(marshaller) {
+            marshaller.io().write_u32(self.len() as u32)?;
+            marshaller.io().write_all(self.as_bytes())?;
+            marshaller.io().write_u8(0)?;
+            Ok(())
+        }
+
+        decode(_marshaller) {
+            use crate::Error;
+
+            Err(Error::Custom {
+                message: "References cannot be decoded".into(),
+            })
+        }
+    }
+}
+
+impl_type! {
+    #[dbus(basic, align = 4)]
+    String: 's' {
+        encode(marshaller) {
+            self.as_str().encode(marshaller)
+        }
+
+        decode(marshaller) {
+            let length = marshaller.io().read_u32()?;
+            let mut data = vec![0; length as usize];
+            marshaller.io().read_exact(&mut data)?;
+            marshaller.io().read_u8()?;
+            let value = String::from_utf8(data)?;
+            Ok(value)
+        }
+    }
 }
 
 // Object path
@@ -39,7 +71,16 @@ impl AsRef<str> for ObjectPath {
 
 impl_type! {
     #[dbus(basic, align = 4)]
-    ObjectPath: 'o'
+    ObjectPath: 'o' {
+        encode(marshaller) {
+            self.0.encode(marshaller)
+        }
+
+        decode(marshaller) {
+            let value = String::decode(marshaller)?;
+            Ok(ObjectPath(value))
+        }
+    }
 }
 
 // Signature
@@ -72,5 +113,21 @@ impl AsRef<str> for Signature {
 
 impl_type! {
     #[dbus(basic)]
-    Signature: 'g'
+    Signature: 'g' {
+        encode(marshaller) {
+            marshaller.io().write_u8(self.0.len() as u8)?;
+            marshaller.io().write_all(self.0.as_bytes())?;
+            marshaller.io().write_u8(0)?;
+            Ok(())
+        }
+
+        decode(marshaller) {
+            let length = marshaller.io().read_u8()?;
+            let mut data = vec![0; length as usize];
+            marshaller.io().read_exact(&mut data)?;
+            marshaller.io().read_u8()?;
+            let value = String::from_utf8(data)?;
+            Ok(Signature(value))
+        }
+    }
 }

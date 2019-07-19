@@ -1,11 +1,13 @@
 use super::DBusType;
 use crate::marshal::Marshaller;
+use crate::Result;
 use std::io;
+
 pub trait DBusPackedTypes: Sized {
     fn signature() -> String;
 
-    fn encode<T: AsRef<[u8]> + io::Write>(&self, marshaller: &mut Marshaller<T>) -> io::Result<()>;
-    fn decode<T: AsRef<[u8]> + io::Read>(marshaller: &mut Marshaller<T>) -> io::Result<Self>;
+    fn encode<T: AsRef<[u8]> + io::Write>(&self, marshaller: &mut Marshaller<T>) -> Result<()>;
+    fn decode<T: AsRef<[u8]> + io::Read>(marshaller: &mut Marshaller<T>) -> Result<Self>;
 }
 
 macro_rules! impl_tuple_type {
@@ -15,12 +17,12 @@ macro_rules! impl_tuple_type {
                 [$($ty::signature()),*].concat()
             }
 
-            fn encode<T: AsRef<[u8]> + io::Write>(&self, marshaller: &mut Marshaller<T>) -> io::Result<()> {
+            fn encode<T: AsRef<[u8]> + io::Write>(&self, marshaller: &mut Marshaller<T>) -> Result<()> {
                 $(self.$index.encode(marshaller)?;)*
                 Ok(())
             }
 
-            fn decode<T: AsRef<[u8]> + io::Read>(marshaller: &mut Marshaller<T>) -> io::Result<Self> {
+            fn decode<T: AsRef<[u8]> + io::Read>(marshaller: &mut Marshaller<T>) -> Result<Self> {
                 Ok(($($ty::decode(marshaller)?),*,))
             }
         }
@@ -48,6 +50,7 @@ mod tests {
     #[test]
     fn test_signature_struct_packed() {
         #[derive(DBusType)]
+        #[dbus(module = "crate")]
         struct Arg(u8, String);
 
         assert_eq!(<(u32, Arg)>::signature(), "u(ys)");
