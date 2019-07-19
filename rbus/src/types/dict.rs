@@ -88,17 +88,17 @@ impl_type! {
 
         encode(marshaller) {
             marshaller.write_padding(Self::alignment())?;
-            marshaller.write_value(&self.0)?;
+            self.0.encode(marshaller)?;
             marshaller.write_padding(Self::alignment())?;
-            marshaller.write_value(&self.1)?;
+            self.1.encode(marshaller)?;
             Ok(())
         }
 
         decode(marshaller) {
             marshaller.read_padding(Self::alignment())?;
-            let key = marshaller.read_value()?;
+            let key = K::decode(marshaller)?;
             marshaller.read_padding(Self::alignment())?;
-            let value = marshaller.read_value()?;
+            let value = V::decode(marshaller)?;
 
             Ok(DictEntry(key, value))
         }

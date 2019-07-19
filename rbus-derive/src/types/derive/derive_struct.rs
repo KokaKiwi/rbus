@@ -52,7 +52,10 @@ impl DeriveStruct {
             where
                 Inner: AsRef<[u8]> + std::io::Write
             {
-                #(self.#field_names.encode(marshaller)?;)*
+                #(
+                    marshaller.write_padding(Self::alignment())?;
+                    self.#field_names.encode(marshaller)?;
+                )*
                 Ok(())
             }
         };
@@ -73,7 +76,10 @@ impl DeriveStruct {
                         Inner: AsRef<[u8]> + std::io::Read
                     {
                         Ok(Self {
-                            #(#names: #types::decode(marshaller)?,)*
+                            #(#names: {
+                                marshaller.read_padding(Self::alignment())?;
+                                #types::decode(marshaller)?
+                            },)*
                         })
                     }
                 }
@@ -86,7 +92,10 @@ impl DeriveStruct {
                     where
                         Inner: AsRef<[u8]> + std::io::Read
                     {
-                        Ok(Self(#(#types::decode(marshaller)?),*))
+                        Ok(Self(#({
+                            marshaller.read_padding(Self::alignment())?;
+                            #types::decode(marshaller)?
+                        }),*))
                     }
                 }
             }
