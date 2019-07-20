@@ -25,7 +25,7 @@ impl BasicTypeDef {
         let tokens = quote::quote! {
             rbus_derive::impl_type! {
                 #(#attrs)*
-                #[dbus(basic)]
+                #[dbus(basic, module = "crate")]
                 #ty: #code {
                     #encode_method
                     #decode_method

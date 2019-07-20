@@ -21,6 +21,7 @@ macro_rules! impl_macro_input {
     (? $fun:path, $($arg:ident),*) => ( impl_macro_input!(? $fun, $($arg: _),*) );
 }
 
+#[doc(hidden)]
 #[proc_macro]
 pub fn impl_basic_type(item: TokenStream) -> TokenStream {
     impl_macro_input!(?types::impl_basic_type, item)

@@ -80,7 +80,7 @@ impl<K, V> FromIterator<(K, V)> for Dict<K, V> {
 }
 
 impl_type! {
-    #[dbus(align = 8)]
+    #[dbus(align = 8, module = "crate")]
     impl<K: DBusBasicType, V: DBusType> DictEntry<K, V>: 'e' {
         signature() {
             format!("{{{}{}}}", K::signature(), V::signature())
@@ -106,7 +106,7 @@ impl_type! {
 }
 
 impl_type! {
-    #[dbus(align = 8)]
+    #[dbus(align = 8, module = "crate")]
     impl<K: DBusBasicType, V: DBusType> Dict<K, V>: 'e' {
         signature() {
             <Vec<DictEntry<K, V>>>::signature()
@@ -125,7 +125,7 @@ impl_type! {
 
 // HashMap
 impl_type! {
-    #[dbus(align = 8)]
+    #[dbus(align = 8, module = "crate")]
     impl<K, V> HashMap<K, V>: 'e'
     where
         K: DBusBasicType + Eq + Hash,

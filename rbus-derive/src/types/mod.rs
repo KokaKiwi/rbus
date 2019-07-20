@@ -31,7 +31,7 @@ impl TypeDef {
         let methods = self.gen_methods()?;
         let generics = self.generics;
         let where_clause = self.where_clause;
-        let rbus_module = self.metas.find_rbus_module("crate")?;
+        let rbus_module = self.metas.find_rbus_module("rbus")?;
 
         let dbus_type_impl = quote::quote! {
             impl #generics #rbus_module::types::DBusType for #ty #where_clause {

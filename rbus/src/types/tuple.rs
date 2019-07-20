@@ -10,7 +10,7 @@ pub trait DBusPackedTypes: Sized {
     fn decode<T: AsRef<[u8]> + io::Read>(marshaller: &mut Marshaller<T>) -> Result<Self>;
 }
 
-macro_rules! impl_tuple_type {
+macro_rules! impl_tuple_packed_type {
     ($($index:tt: $ty:ident),*) => {
         impl<$($ty: DBusType),*> DBusPackedTypes for ($($ty),*,) {
             fn signature() -> String {
@@ -29,14 +29,14 @@ macro_rules! impl_tuple_type {
     }
 }
 
-impl_tuple_type!(0: A);
-impl_tuple_type!(0: A, 1: B);
-impl_tuple_type!(0: A, 1: B, 2: C);
-impl_tuple_type!(0: A, 1: B, 2: C, 3: D);
-impl_tuple_type!(0: A, 1: B, 2: C, 3: D, 4: E);
-impl_tuple_type!(0: A, 1: B, 2: C, 3: D, 4: E, 5: F);
-impl_tuple_type!(0: A, 1: B, 2: C, 3: D, 4: E, 5: F, 6: G);
-impl_tuple_type!(0: A, 1: B, 2: C, 3: D, 4: E, 5: F, 6: G, 7: H);
+impl_tuple_packed_type!(0: A);
+impl_tuple_packed_type!(0: A, 1: B);
+impl_tuple_packed_type!(0: A, 1: B, 2: C);
+impl_tuple_packed_type!(0: A, 1: B, 2: C, 3: D);
+impl_tuple_packed_type!(0: A, 1: B, 2: C, 3: D, 4: E);
+impl_tuple_packed_type!(0: A, 1: B, 2: C, 3: D, 4: E, 5: F);
+impl_tuple_packed_type!(0: A, 1: B, 2: C, 3: D, 4: E, 5: F, 6: G);
+impl_tuple_packed_type!(0: A, 1: B, 2: C, 3: D, 4: E, 5: F, 6: G, 7: H);
 
 #[cfg(test)]
 mod tests {

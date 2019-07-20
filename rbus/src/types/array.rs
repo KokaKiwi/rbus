@@ -2,7 +2,7 @@ use super::DBusType;
 use rbus_derive::impl_type;
 
 impl_type! {
-    #[dbus(align = 4)]
+    #[dbus(align = 4, module = "crate")]
     impl<T: DBusType> Vec<T>: 'a' {
         signature() {
             format!("a{}", T::signature())

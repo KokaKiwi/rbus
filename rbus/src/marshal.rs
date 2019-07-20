@@ -1,6 +1,7 @@
 use crate::types::{DBusPackedTypes, DBusType};
 use crate::Result;
-use byteordered::{ByteOrdered, Endianness};
+use byteordered::ByteOrdered;
+pub use byteordered::Endianness;
 use std::io;
 
 pub struct Marshaller<T> {
