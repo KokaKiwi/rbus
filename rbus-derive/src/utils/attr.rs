@@ -34,6 +34,16 @@ impl Metas {
             .collect()
     }
 
+    pub fn find_meta_idents(&self) -> Vec<&syn::Ident> {
+        self.0
+            .iter()
+            .filter_map(|nested_meta| match nested_meta {
+                syn::NestedMeta::Meta(syn::Meta::Word(ident)) => Some(ident),
+                _ => None,
+            })
+            .collect()
+    }
+
     pub fn has_meta_word(&self, name: &str) -> Result<bool> {
         match self.find_meta(name) {
             Some(syn::Meta::Word(_)) => Ok(true),

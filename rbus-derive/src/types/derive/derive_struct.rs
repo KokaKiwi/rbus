@@ -44,7 +44,7 @@ impl DeriveStruct {
     }
 
     fn gen_encode_method(&self, ty: &DeriveTypeDef) -> Result<TokenStream> {
-        let rbus_module = ty.metas.find_rbus_module("rbus")?;
+        let rbus_module = ty.metas.find_meta_nested("dbus").find_rbus_module("rbus")?;
         let field_names = self.field_names();
 
         let tokens = quote::quote! {
@@ -64,7 +64,7 @@ impl DeriveStruct {
     }
 
     fn gen_decode_method(&self, ty: &DeriveTypeDef) -> Result<TokenStream> {
-        let rbus_module = ty.metas.find_rbus_module("rbus")?;
+        let rbus_module = ty.metas.find_meta_nested("dbus").find_rbus_module("rbus")?;
 
         let tokens = match self.fields {
             Fields::Named(ref fields) => {

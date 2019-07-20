@@ -11,10 +11,6 @@ mod basic;
 mod derive;
 mod method;
 
-fn parse_dbus_metas(input: ParseStream) -> Result<Metas> {
-    Metas::parse_named(input, "dbus")
-}
-
 #[derive(Debug, Clone, PartialEq)]
 pub struct TypeDef {
     metas: Metas,
@@ -31,7 +27,10 @@ impl TypeDef {
         let methods = self.gen_methods()?;
         let generics = self.generics;
         let where_clause = self.where_clause;
-        let rbus_module = self.metas.find_rbus_module("rbus")?;
+        let rbus_module = self
+            .metas
+            .find_meta_nested("dbus")
+            .find_rbus_module("rbus")?;
 
         let dbus_type_impl = quote::quote! {
             impl #generics #rbus_module::types::DBusType for #ty #where_clause {
@@ -39,13 +38,14 @@ impl TypeDef {
             }
         };
 
-        let basic_type_impl = if let Ok(true) = self.metas.has_meta_word("basic") {
-            quote::quote! {
-                impl #generics #rbus_module::types::DBusBasicType for #ty #where_clause {}
-            }
-        } else {
-            quote::quote!()
-        };
+        let basic_type_impl =
+            if let Ok(true) = self.metas.find_meta_nested("dbus").has_meta_word("basic") {
+                quote::quote! {
+                    impl #generics #rbus_module::types::DBusBasicType for #ty #where_clause {}
+                }
+            } else {
+                quote::quote!()
+            };
 
         let tokens = quote::quote! {
             #dbus_type_impl
@@ -90,7 +90,11 @@ impl TypeDef {
     }
 
     fn gen_alignment_method(&self) -> Result<TokenStream> {
-        let alignment = match self.metas.find_meta_value("align")? {
+        let alignment = match self
+            .metas
+            .find_meta_nested("dbus")
+            .find_meta_value("align")?
+        {
             Some(syn::Lit::Int(lit)) => quote::quote!(#lit as u8),
             Some(syn::Lit::Str(lit)) if lit.value() == "size" => {
                 quote::quote!(std::mem::size_of::<Self>() as u8)
@@ -112,7 +116,7 @@ impl TypeDef {
 
 impl Parse for TypeDef {
     fn parse(input: ParseStream) -> Result<Self> {
-        let metas = input.call(parse_dbus_metas)?;
+        let metas = input.parse()?;
 
         let generics = if input.peek(syn::Token![impl]) {
             input.parse::<syn::Token![impl]>()?;

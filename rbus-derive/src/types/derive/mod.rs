@@ -1,4 +1,4 @@
-use crate::utils::{parse_named_metas, Metas};
+use crate::utils::{parse_metas, Metas};
 use derive_enum::*;
 use derive_struct::*;
 pub use fields::*;
@@ -96,7 +96,7 @@ impl Parse for DeriveTypeDef {
 
         let derive_input = input.parse::<syn::DeriveInput>()?;
         let span = derive_input.span();
-        let metas = parse_named_metas(&derive_input.attrs, "dbus")?;
+        let metas = parse_metas(&derive_input.attrs)?;
         let data = DeriveData::try_from(derive_input.data)?;
 
         Ok(DeriveTypeDef {

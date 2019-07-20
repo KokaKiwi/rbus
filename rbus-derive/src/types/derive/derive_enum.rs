@@ -29,7 +29,7 @@ impl DeriveEnum {
     }
 
     fn gen_encode_method(&self, ty: &DeriveTypeDef) -> Result<TokenStream> {
-        let rbus_module = ty.metas.find_rbus_module("rbus")?;
+        let rbus_module = ty.metas.find_meta_nested("dbus").find_rbus_module("rbus")?;
         let variants = self
             .variants
             .iter()
@@ -77,7 +77,7 @@ impl DeriveEnum {
     }
 
     fn gen_decode_method(&self, ty: &DeriveTypeDef) -> Result<TokenStream> {
-        let rbus_module = ty.metas.find_rbus_module("rbus")?;
+        let rbus_module = ty.metas.find_meta_nested("dbus").find_rbus_module("rbus")?;
         let variants = self
             .variants
             .iter()
