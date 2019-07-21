@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-pub fn bt<T, E>(expr: Result<T, E>) -> Result<T, E> {
+pub fn bt<T, E: std::fmt::Debug>(expr: Result<T, E>) -> Result<T, E> {
     use backtrace::Backtrace;
 
     match expr {
@@ -8,6 +8,7 @@ pub fn bt<T, E>(expr: Result<T, E>) -> Result<T, E> {
         Err(err) => {
             let bt = Backtrace::new();
             println!("{:?}", bt);
+            dbg!(&err);
 
             Err(err)
         }

@@ -4,7 +4,7 @@ pub use array::*;
 pub use basic::*;
 pub use dict::*;
 #[doc(hidden)]
-pub use rbus_derive::DBusType;
+pub use rbus_derive::{impl_type, DBusType};
 use std::io;
 pub use string::*;
 pub use tuple::*;

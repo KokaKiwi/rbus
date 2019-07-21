@@ -47,9 +47,11 @@ impl Fields {
         if self.is_named() || self.len() > 1 {
             let signature_format_str = format!("({})", "{}".repeat(self.len()));
             quote::quote!(format!(#signature_format_str, #(<#types>::signature()),*))
-        } else {
+        } else if self.len() == 1 {
             let ty = types[0];
             quote::quote!(<#ty>::signature())
+        } else {
+            panic!("Unit variant have no signature!")
         }
     }
 
@@ -57,10 +59,12 @@ impl Fields {
         if self.is_named() || self.len() > 1 {
             let alignment = syn::LitInt::new(8, syn::IntSuffix::None, Span::call_site());
             quote::quote!(#alignment)
-        } else {
+        } else if self.len() == 1 {
             let types = self.types();
             let ty = types[0];
             quote::quote!(<#ty>::alignment())
+        } else {
+            panic!("Unit variant have no alignment");
         }
     }
 

@@ -1,5 +1,5 @@
 use std::iter::FromIterator;
-use syn::parse::{Parse, ParseStream, Result};
+use syn::parse::{Parse, ParseStream, Parser, Result};
 use syn::spanned::Spanned;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -12,6 +12,26 @@ impl Metas {
             .iter()
             .filter_map(|nested_meta| match nested_meta {
                 syn::NestedMeta::Literal(lit) => Some(lit),
+                _ => None,
+            })
+            .collect()
+    }
+
+    pub fn metas(&self) -> Vec<&syn::Meta> {
+        self.0
+            .iter()
+            .filter_map(|nested_meta| match nested_meta {
+                syn::NestedMeta::Meta(meta) => Some(meta),
+                _ => None,
+            })
+            .collect()
+    }
+
+    pub fn words(&self) -> Vec<&syn::Ident> {
+        self.metas()
+            .into_iter()
+            .filter_map(|meta| match meta {
+                syn::Meta::Word(ident) => Some(ident),
                 _ => None,
             })
             .collect()
@@ -90,6 +110,31 @@ impl Metas {
         })
     }
 
+    pub fn find_meta_value_parse<T: Parse>(&self, name: &str) -> Result<T> {
+        self.find_meta_value_str(name)
+            .and_then(|value| match value {
+                Some(value) => value.parse(),
+                None => Err(syn::Error::new(
+                    value.span(),
+                    &format!("Bad value: {:?}", value),
+                )),
+            })
+    }
+
+    pub fn find_meta_value_parse_with<T, F>(&self, name: &str, parser: F) -> Result<T>
+    where
+        T: Parse,
+        F: Parser<Output = T>,
+    {
+        self.find_meta_value_str(name)
+            .and_then(|value| match value {
+                Some(value) => value.parse_with(parser),
+                None => Err(syn::Error::new(
+                    value.span(),
+                    &format!("Bad value: {:?}", value),
+                )),
+            })
+    }
     pub fn find_meta_value_int(&self, name: &str) -> Result<Option<&syn::LitInt>> {
         self.find_meta_value(name).and_then(|value| match value {
             Some(syn::Lit::Int(lit)) => Ok(Some(lit)),
@@ -143,13 +188,6 @@ impl Parse for Metas {
             .call(syn::Attribute::parse_outer)
             .and_then(parse_metas)
     }
-}
-
-pub fn parse_named_metas<T>(attrs: T, name: &str) -> Result<Metas>
-where
-    T: AsRef<[syn::Attribute]>,
-{
-    Ok(parse_metas(attrs)?.find_meta_nested(name))
 }
 
 pub fn parse_metas<T>(attrs: T) -> Result<Metas>

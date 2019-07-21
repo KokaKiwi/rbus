@@ -1,4 +1,4 @@
-use crate::utils::{parse_metas, Metas};
+use crate::utils::{parse_metas, DBusMetas, Metas};
 use derive_enum::*;
 use derive_struct::*;
 pub use fields::*;
@@ -30,10 +30,44 @@ pub enum DeriveData {
 
 impl DeriveData {
     fn gen_body(&self, ty: &DeriveTypeDef) -> Result<TokenStream> {
-        match self {
-            DeriveData::Enum(ref data) => data.gen_body(ty),
-            DeriveData::Struct(ref data) => data.gen_body(ty),
+        let proxy = ty.metas.find_meta_nested("dbus").find_meta_nested("proxy");
+        if proxy.is_empty() {
+            match self {
+                DeriveData::Enum(ref data) => data.gen_body(ty),
+                DeriveData::Struct(ref data) => data.gen_body(ty),
+            }
+        } else {
+            self.gen_proxy_body(ty, proxy)
         }
+    }
+
+    fn gen_proxy_body(&self, ty: &DeriveTypeDef, proxy: Metas) -> Result<TokenStream> {
+        let rbus_module = ty.metas.find_meta_nested("dbus").find_rbus_module("rbus");
+        let proxy_ty: syn::Type = proxy.find_meta_value_parse("ty")?;
+        let getter: syn::Ident = proxy.find_meta_value_parse("get")?;
+        let setter: syn::Ident = proxy.find_meta_value_parse("set")?;
+
+        let tokens = quote::quote! {
+            fn code() -> u8 { <#proxy_ty>::code() }
+            fn signature() -> String { <#proxy_ty>::signature() }
+            fn alignment() -> u8 { <#proxy_ty>::alignment() }
+
+            fn encode<Inner>(&self, marshaller: &mut #rbus_module::marshal::Marshaller<Inner>) -> #rbus_module::Result<()>
+            where
+                Inner: AsRef<[u8]> + std::io::Write
+            {
+                self.#getter().encode(marshaller)
+            }
+            fn decode<Inner>(marshaller: &mut #rbus_module::marshal::Marshaller<Inner>) -> #rbus_module::Result<Self>
+            where
+                Inner: AsRef<[u8]> + std::io::Read
+            {
+                let value = <#proxy_ty>::decode(marshaller)?;
+                Ok(Self::#setter(value))
+            }
+        };
+
+        Ok(tokens)
     }
 }
 

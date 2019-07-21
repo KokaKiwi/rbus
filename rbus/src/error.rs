@@ -14,6 +14,8 @@ custom_error! {
             = "Signature error: {source}",
         ObjectPath { source: ObjectPathError }
             = "Object path error: {source}",
+        InvalidVariant { value: u64 }
+            = "Invalid variant value: {value}",
         Custom { message: String }
             = "{message}",
         Unknown

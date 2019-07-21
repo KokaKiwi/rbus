@@ -30,7 +30,7 @@ impl TypeDef {
         let rbus_module = self
             .metas
             .find_meta_nested("dbus")
-            .find_rbus_module("rbus")?;
+            .find_rbus_module("crate");
 
         let dbus_type_impl = quote::quote! {
             impl #generics #rbus_module::types::DBusType for #ty #where_clause {

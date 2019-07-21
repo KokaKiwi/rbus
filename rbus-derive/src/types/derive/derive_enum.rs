@@ -13,6 +13,19 @@ pub struct DeriveEnum {
 
 impl DeriveEnum {
     pub fn gen_body(&self, ty: &DeriveTypeDef) -> Result<TokenStream> {
+        if self.variants.is_complete() {
+            self.gen_complete_body(ty)
+        } else if self.variants.is_unit() {
+            self.gen_unit_body(ty)
+        } else {
+            Err(syn::Error::new(
+                ty.span,
+                "Can't derive mixed unit and named/unnamed fields",
+            ))
+        }
+    }
+
+    fn gen_complete_body(&self, ty: &DeriveTypeDef) -> Result<TokenStream> {
         let encode_method = self.gen_encode_method(ty)?;
         let decode_method = self.gen_decode_method(ty)?;
 
@@ -28,8 +41,50 @@ impl DeriveEnum {
         Ok(body)
     }
 
+    fn gen_unit_body(&self, ty: &DeriveTypeDef) -> Result<TokenStream> {
+        let rbus_module = ty.metas.find_meta_nested("dbus").find_rbus_module("rbus");
+        let repr: syn::Ident = ty
+            .metas
+            .find_meta_nested("repr")
+            .words()
+            .first()
+            .cloned()
+            .cloned()
+            .ok_or_else(|| syn::Error::new(ty.span, "Unit-only enums must have a fixed repr"))?;
+
+        let ty_names = vec![&ty.name; self.variants.len()];
+        let variant_names = self.variants.iter().map(|variant| &variant.name);
+        let values = self.variants.values();
+
+        let tokens = quote::quote! {
+            fn code() -> u8 { <#repr>::code() }
+            fn signature() -> String { <#repr>::signature() }
+            fn alignment() -> u8 { <#repr>::alignment() }
+
+            fn encode<Inner>(&self, marshaller: &mut #rbus_module::marshal::Marshaller<Inner>) -> #rbus_module::Result<()>
+            where
+                Inner: AsRef<[u8]> + std::io::Write
+            {
+                (*self as #repr).encode(marshaller)
+            }
+
+            fn decode<Inner>(marshaller: &mut #rbus_module::marshal::Marshaller<Inner>) -> #rbus_module::Result<Self>
+            where
+                Inner: AsRef<[u8]> + std::io::Read
+            {
+                let value = <#repr>::decode(marshaller)?;
+                match value {
+                    #(#values => Ok(#ty_names::#variant_names),)*
+                    value => Err(#rbus_module::Error::InvalidVariant { value: value as u64, }),
+                }
+            }
+        };
+
+        Ok(tokens)
+    }
+
     fn gen_encode_method(&self, ty: &DeriveTypeDef) -> Result<TokenStream> {
-        let rbus_module = ty.metas.find_meta_nested("dbus").find_rbus_module("rbus")?;
+        let rbus_module = ty.metas.find_meta_nested("dbus").find_rbus_module("rbus");
         let variants = self
             .variants
             .iter()
@@ -77,7 +132,7 @@ impl DeriveEnum {
     }
 
     fn gen_decode_method(&self, ty: &DeriveTypeDef) -> Result<TokenStream> {
-        let rbus_module = ty.metas.find_meta_nested("dbus").find_rbus_module("rbus")?;
+        let rbus_module = ty.metas.find_meta_nested("dbus").find_rbus_module("rbus");
         let variants = self
             .variants
             .iter()

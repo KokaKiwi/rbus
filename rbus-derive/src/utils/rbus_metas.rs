@@ -1,18 +1,14 @@
 use super::Metas;
-use syn::parse::Result;
+use proc_macro2::Span;
+use syn::ext::IdentExt;
 
 pub trait DBusMetas {
     fn metas(&self) -> &Metas;
 
-    fn find_rbus_module(&self, default: &str) -> Result<syn::Path> {
-        let path = self
-            .metas()
-            .find_meta_value_str("module")?
-            .cloned()
-            .unwrap_or_else(|| syn::parse_quote!(#default))
-            .parse()?;
-
-        Ok(path)
+    fn find_rbus_module(&self, default: &str) -> syn::Ident {
+        self.metas()
+            .find_meta_value_parse_with("module", syn::Ident::parse_any)
+            .unwrap_or_else(|_| syn::Ident::new(default, Span::call_site()))
     }
 }
 
