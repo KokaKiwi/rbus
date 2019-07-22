@@ -29,7 +29,7 @@ pub trait DBusType: Sized {
 }
 
 impl_type! {
-    impl<T: DBusType> &T: '\0' {
+    impl<T: DBusType> &T {
         code() {
             T::code()
         }
@@ -52,6 +52,22 @@ impl_type! {
             Err(Error::Custom {
                 message: "References cannot be decoded".into(),
             })
+        }
+    }
+}
+
+impl_type! {
+    () {
+        signature() {
+            "".into()
+        }
+
+        encode(_marshaller) {
+            Ok(())
+        }
+
+        decode(_marshaller) {
+            Ok(())
         }
     }
 }

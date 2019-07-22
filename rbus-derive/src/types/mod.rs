@@ -16,7 +16,7 @@ pub struct TypeDef {
     metas: Metas,
     generics: Option<syn::Generics>,
     ty: syn::Type,
-    code: syn::LitChar,
+    code: Option<syn::LitChar>,
     where_clause: Option<syn::WhereClause>,
     methods: Methods,
 }
@@ -73,8 +73,12 @@ impl TypeDef {
         Ok(methods)
     }
 
+    fn code(&self) -> char {
+        self.code.as_ref().map(|code| code.value()).unwrap_or('\0')
+    }
+
     fn gen_code_method(&self) -> Result<TokenStream> {
-        let code = &self.code;
+        let code = self.code();
 
         Ok(quote::quote! {
             fn code() -> u8 { #code as u8 }
@@ -87,7 +91,7 @@ impl TypeDef {
             .find_meta_nested("dbus")
             .find_meta_value_str("signature")?
             .map(|value| value.value())
-            .unwrap_or_else(|| format!("{}", self.code.value()));
+            .unwrap_or_else(|| format!("{}", self.code()));
 
         Ok(quote::quote! {
             fn signature() -> String { #signature.into() }
@@ -132,8 +136,12 @@ impl Parse for TypeDef {
         };
 
         let ty = input.parse()?;
-        input.parse::<syn::Token![:]>()?;
-        let code = input.parse()?;
+        let code = if input.peek(syn::Token![:]) {
+            input.parse::<syn::Token![:]>()?;
+            Some(input.parse()?)
+        } else {
+            None
+        };
         let where_clause = input.parse()?;
         let methods = input.call(method::parse_methods)?;
 
