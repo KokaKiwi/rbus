@@ -20,36 +20,39 @@ pub trait DBusType: Sized {
     fn signature() -> String;
     fn alignment() -> u8;
 
-    fn encode<Inner: AsRef<[u8]> + io::Write>(
-        &self,
-        marshaller: &mut Marshaller<Inner>,
-    ) -> Result<()>;
-    fn decode<Inner: AsRef<[u8]> + io::Read>(marshaller: &mut Marshaller<Inner>) -> Result<Self>;
+    fn encode<Inner>(&self, marshaller: &mut Marshaller<Inner>) -> Result<()>
+    where
+        Inner: AsRef<[u8]> + AsMut<[u8]> + io::Write;
+    fn decode<Inner>(marshaller: &mut Marshaller<Inner>) -> Result<Self>
+    where
+        Inner: AsRef<[u8]> + io::Read;
 }
 
-impl<T: DBusType> DBusType for &T {
-    fn code() -> u8 {
-        T::code()
-    }
-    fn signature() -> String {
-        T::signature()
-    }
-    fn alignment() -> u8 {
-        T::alignment()
-    }
+impl_type! {
+    impl<T: DBusType> &T: '\0' {
+        code() {
+            T::code()
+        }
 
-    fn encode<Inner: AsRef<[u8]> + io::Write>(
-        &self,
-        marshaller: &mut Marshaller<Inner>,
-    ) -> Result<()> {
-        (*self).encode(marshaller)
-    }
-    fn decode<Inner: AsRef<[u8]> + io::Read>(_marshaller: &mut Marshaller<Inner>) -> Result<Self> {
-        use crate::Error;
+        signature() {
+            T::signature()
+        }
 
-        Err(Error::Custom {
-            message: "References cannot be decoded".into(),
-        })
+        alignment() {
+            T::alignment()
+        }
+
+        encode(marshaller) {
+            (*self).encode(marshaller)
+        }
+
+        decode(_marshaller) {
+            use crate::Error;
+
+            Err(Error::Custom {
+                message: "References cannot be decoded".into(),
+            })
+        }
     }
 }
 

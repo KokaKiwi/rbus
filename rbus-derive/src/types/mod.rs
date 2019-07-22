@@ -1,6 +1,6 @@
 use crate::utils::{DBusMetas, Metas};
 pub use basic::impl_basic_type;
-pub use derive::derive_type;
+pub use derive::*;
 use method::Methods;
 use proc_macro2::TokenStream;
 use std::collections::HashMap;
@@ -82,7 +82,12 @@ impl TypeDef {
     }
 
     fn gen_signature_method(&self) -> Result<TokenStream> {
-        let signature = format!("{}", self.code.value());
+        let signature = self
+            .metas
+            .find_meta_nested("dbus")
+            .find_meta_value_str("signature")?
+            .map(|value| value.value())
+            .unwrap_or_else(|| format!("{}", self.code.value()));
 
         Ok(quote::quote! {
             fn signature() -> String { #signature.into() }

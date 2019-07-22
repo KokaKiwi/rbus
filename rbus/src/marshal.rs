@@ -2,50 +2,70 @@ use crate::types::{DBusPackedTypes, DBusType};
 use crate::Result;
 use byteordered::ByteOrdered;
 pub use byteordered::Endianness;
-use std::io;
+use std::io::{self, Cursor, Read, Write};
+use std::ops::{Deref, DerefMut};
 
 pub struct Marshaller<T> {
-    inner: T,
+    inner: Cursor<T>,
     pub endianness: Endianness,
 }
 
 impl<T> Marshaller<T> {
     pub fn new(inner: T, endianness: Endianness) -> Marshaller<T> {
-        Marshaller { inner, endianness }
+        Marshaller {
+            inner: Cursor::new(inner),
+            endianness,
+        }
+    }
+
+    pub fn new_native(inner: T) -> Marshaller<T> {
+        Marshaller::new(inner, Endianness::native())
     }
 
     pub fn io(&mut self) -> ByteOrdered<&mut T, Endianness> {
-        ByteOrdered::runtime(&mut self.inner, self.endianness)
-    }
-}
-
-impl<T: AsRef<[u8]>> Marshaller<T> {
-    pub fn to_slice(&self) -> &[u8] {
-        self.inner.as_ref()
-    }
-
-    pub fn len(&self) -> usize {
-        self.to_slice().len()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-}
-
-impl Marshaller<Vec<u8>> {
-    pub fn into_vec(self) -> Vec<u8> {
-        self.inner
+        ByteOrdered::runtime(self.inner.get_mut(), self.endianness)
     }
 }
 
 impl<T> Marshaller<T>
 where
-    T: AsRef<[u8]> + io::Write,
+    T: AsRef<[u8]> + AsMut<[u8]> + Write,
+{
+    fn writer(&mut self) -> Cursor<&mut [u8]> {
+        Cursor::new(self.as_mut())
+    }
+}
+
+impl<T: AsRef<[u8]>> Deref for Marshaller<T> {
+    type Target = [u8];
+
+    fn deref(&self) -> &Self::Target {
+        self.inner.get_ref().as_ref()
+    }
+}
+
+impl<T> DerefMut for Marshaller<T>
+where
+    T: AsRef<[u8]> + AsMut<[u8]>,
+{
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.inner.get_mut().as_mut()
+    }
+}
+
+impl Marshaller<Vec<u8>> {
+    pub fn into_vec(self) -> Vec<u8> {
+        self.inner.into_inner()
+    }
+}
+
+impl<T> Marshaller<T>
+where
+    T: AsRef<[u8]> + AsMut<[u8]> + Write,
 {
     pub fn write_padding(&mut self, alignment: u8) -> io::Result<()> {
         let padding = vec![0; self.len() % alignment as usize];
-        self.inner.write_all(&padding)?;
+        self.writer().write_all(&padding)?;
         Ok(())
     }
 
@@ -61,10 +81,10 @@ where
 
 impl<T> Marshaller<T>
 where
-    T: AsRef<[u8]> + io::Read,
+    T: AsRef<[u8]> + Read,
 {
     pub fn read_padding(&mut self, alignment: u8) -> io::Result<usize> {
-        let padding_len = self.len() % alignment as usize;
+        let padding_len = self.inner.position() as usize % alignment as usize;
         let mut padding = Vec::with_capacity(padding_len);
         unsafe { padding.set_len(padding_len) }
         self.inner.read_exact(&mut padding)?;

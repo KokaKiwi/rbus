@@ -1,6 +1,6 @@
 use super::DeriveTypeDef;
 use super::{Fields, Variant, Variants};
-use crate::utils::DBusMetas;
+use crate::utils::{DBusMetas, Metas};
 use proc_macro2::TokenStream;
 use std::convert::TryFrom;
 use syn::parse::Result;
@@ -14,9 +14,16 @@ pub struct DeriveEnum {
 impl DeriveEnum {
     pub fn gen_body(&self, ty: &DeriveTypeDef) -> Result<TokenStream> {
         if self.variants.is_complete() {
-            self.gen_complete_body(ty)
+            Ok(self.gen_complete_body(ty))
         } else if self.variants.is_unit() {
             self.gen_unit_body(ty)
+        } else if let Some(index) = ty
+            .metas
+            .find_meta_nested("dbus")
+            .find_meta_nested("index")
+            .option()
+        {
+            self.gen_index_body(ty, index)
         } else {
             Err(syn::Error::new(
                 ty.span,
@@ -25,9 +32,9 @@ impl DeriveEnum {
         }
     }
 
-    fn gen_complete_body(&self, ty: &DeriveTypeDef) -> Result<TokenStream> {
-        let encode_method = self.gen_encode_method(ty)?;
-        let decode_method = self.gen_decode_method(ty)?;
+    fn gen_complete_body(&self, ty: &DeriveTypeDef) -> TokenStream {
+        let encode_method = self.gen_encode_method(ty);
+        let decode_method = self.gen_decode_method(ty);
 
         let body = quote::quote! {
             fn code() -> u8 { b'v' }
@@ -38,7 +45,7 @@ impl DeriveEnum {
             #decode_method
         };
 
-        Ok(body)
+        body
     }
 
     fn gen_unit_body(&self, ty: &DeriveTypeDef) -> Result<TokenStream> {
@@ -63,7 +70,7 @@ impl DeriveEnum {
 
             fn encode<Inner>(&self, marshaller: &mut #rbus_module::marshal::Marshaller<Inner>) -> #rbus_module::Result<()>
             where
-                Inner: AsRef<[u8]> + std::io::Write
+                Inner: AsRef<[u8]> + AsMut<[u8]> + std::io::Write
             {
                 (*self as #repr).encode(marshaller)
             }
@@ -83,61 +90,146 @@ impl DeriveEnum {
         Ok(tokens)
     }
 
-    fn gen_encode_method(&self, ty: &DeriveTypeDef) -> Result<TokenStream> {
+    fn gen_index_body(&self, ty: &DeriveTypeDef, index: Metas) -> Result<TokenStream> {
         let rbus_module = ty.metas.find_meta_nested("dbus").find_rbus_module("rbus");
-        let variants = self
+        let index_ty =
+            index.words().first().cloned().ok_or_else(|| {
+                syn::Error::new(ty.span, "Unit-only enums must have a fixed repr")
+            })?;
+        let indexes = self.variants.indexes()?;
+        let variant_encodes: TokenStream = self
             .variants
             .iter()
-            .map(|variant| self.gen_encode_variant(ty, variant))
-            .collect::<Result<Vec<_>>>()?;
+            .zip(&indexes)
+            .map(|(variant, index)| {
+                let encode_body = self.gen_encode_variant_body(variant);
+                let pre = quote::quote! {
+                    marshaller.io().write_u8(#index)?;
+                };
+                let body = vec![pre, encode_body].into_iter().collect::<TokenStream>();
+                self.gen_encode_variant(ty, variant, body)
+            })
+            .collect();
+        let variant_decodes: TokenStream = self
+            .variants
+            .iter()
+            .zip(&indexes)
+            .map(|(variant, index)| {
+                let body = self.gen_decode_variant_body(ty, variant);
+                let signature = variant.fields.signature();
+
+                quote::quote! {
+                    if signature == #signature && value == #index {
+                        #body
+                    }
+                }
+            })
+            .collect();
+
+        let tokens = quote::quote! {
+            fn code() -> u8 { b'r' }
+            fn signature() -> String { format!("({}v)", <#index_ty>::signature()) }
+            fn alignment() -> u8 { 8 }
+
+            fn encode<Inner>(&self, marshaller: &mut #rbus_module::marshal::Marshaller<Inner>) -> #rbus_module::Result<()>
+            where
+                Inner: AsRef<[u8]> + AsMut<[u8]> + std::io::Write
+            {
+                use #rbus_module::types::Signature;
+
+                match self {
+                    #variant_encodes
+                }
+            }
+
+            fn decode<Inner>(marshaller: &mut #rbus_module::marshal::Marshaller<Inner>) -> #rbus_module::Result<Self>
+            where
+                Inner: AsRef<[u8]> + std::io::Read
+            {
+                use #rbus_module::types::Signature;
+
+                let value = marshaller.io().read_u8()?;
+
+                let signature = Signature::decode(marshaller)?;
+                let signature = signature.as_str();
+
+                #variant_decodes
+                Err(#rbus_module::Error::Custom {
+                    message: "Bad variant value".into(),
+                })
+            }
+        };
+
+        Ok(tokens)
+    }
+
+    fn gen_encode_method(&self, ty: &DeriveTypeDef) -> TokenStream {
+        let rbus_module = ty.metas.find_meta_nested("dbus").find_rbus_module("rbus");
+        let variants = self.variants.iter().map(|variant| {
+            let body = self.gen_encode_variant_body(variant);
+            self.gen_encode_variant(ty, variant, body)
+        });
 
         let tokens = quote::quote! {
             fn encode<Inner>(&self, marshaller: &mut #rbus_module::marshal::Marshaller<Inner>) -> #rbus_module::Result<()>
             where
-                Inner: AsRef<[u8]> + std::io::Write
+                Inner: AsRef<[u8]> + AsMut<[u8]> + std::io::Write
             {
                 use #rbus_module::types::Signature;
 
                 match self {
                     #(#variants)*
                 }
+            }
+        };
+
+        tokens
+    }
+
+    fn gen_encode_variant(
+        &self,
+        ty: &DeriveTypeDef,
+        variant: &Variant,
+        body: TokenStream,
+    ) -> TokenStream {
+        let ty_name = &ty.name;
+        let variant_name = &variant.name;
+        let pat = variant.fields.pat(true);
+
+        let tokens = quote::quote! {
+            #ty_name::#variant_name #pat => {
+                #body
                 Ok(())
             }
         };
 
-        Ok(tokens)
+        tokens
     }
 
-    fn gen_encode_variant(&self, ty: &DeriveTypeDef, variant: &Variant) -> Result<TokenStream> {
-        let ty_name = &ty.name;
-        let variant_name = &variant.name;
-        let pat = variant.fields.pat();
+    fn gen_encode_variant_body(&self, variant: &Variant) -> TokenStream {
         let names = variant.fields.pat_names();
         let signature = variant.fields.signature();
         let alignment = vec![variant.fields.alignment(); names.len()];
 
         let tokens = quote::quote! {
-            #ty_name::#variant_name #pat => {
-                let signature = Signature::new(#signature)?;
-                signature.encode(marshaller)?;
+            let signature = Signature::new(#signature)?;
+            signature.encode(marshaller)?;
 
-                #(
-                marshaller.write_padding(#alignment)?;
-                #names.encode(marshaller)?;
-                )*
-            }
+            #(
+            marshaller.write_padding(#alignment)?;
+            #names.encode(marshaller)?;
+            )*
         };
 
-        Ok(tokens)
+        tokens
     }
 
-    fn gen_decode_method(&self, ty: &DeriveTypeDef) -> Result<TokenStream> {
+    fn gen_decode_method(&self, ty: &DeriveTypeDef) -> TokenStream {
         let rbus_module = ty.metas.find_meta_nested("dbus").find_rbus_module("rbus");
-        let variants = self
-            .variants
-            .iter()
-            .map(|variant| self.gen_decode_variant(ty, variant))
-            .collect::<Result<Vec<_>>>()?;
+        let variants = self.variants.iter().map(|variant| {
+            let body = self.gen_decode_variant_body(ty, variant);
+            self.gen_decode_variant(variant, body)
+        });
 
         let tokens = quote::quote! {
             fn decode<Inner>(marshaller: &mut #rbus_module::marshal::Marshaller<Inner>) -> #rbus_module::Result<Self>
@@ -156,13 +248,24 @@ impl DeriveEnum {
             }
         };
 
-        Ok(tokens)
+        tokens
     }
 
-    fn gen_decode_variant(&self, ty: &DeriveTypeDef, variant: &Variant) -> Result<TokenStream> {
+    fn gen_decode_variant(&self, variant: &Variant, body: TokenStream) -> TokenStream {
+        let signature = variant.fields.signature();
+
+        let tokens = quote::quote! {
+            if signature == #signature {
+                #body
+            }
+        };
+
+        tokens
+    }
+
+    fn gen_decode_variant_body(&self, ty: &DeriveTypeDef, variant: &Variant) -> TokenStream {
         let ty_name = &ty.name;
         let variant_name = &variant.name;
-        let signature = variant.fields.signature();
         let alignment = vec![variant.fields.alignment(); variant.fields.len()];
 
         let construct = match variant.fields {
@@ -191,13 +294,7 @@ impl DeriveEnum {
             Fields::Unit => quote::quote!(#ty_name::#variant_name),
         };
 
-        let tokens = quote::quote! {
-            if signature == #signature {
-                return Ok(#construct);
-            }
-        };
-
-        Ok(tokens)
+        quote::quote!(return Ok(#construct))
     }
 }
 

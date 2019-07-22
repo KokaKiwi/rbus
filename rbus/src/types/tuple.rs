@@ -6,8 +6,12 @@ use std::io;
 pub trait DBusPackedTypes: Sized {
     fn signature() -> String;
 
-    fn encode<T: AsRef<[u8]> + io::Write>(&self, marshaller: &mut Marshaller<T>) -> Result<()>;
-    fn decode<T: AsRef<[u8]> + io::Read>(marshaller: &mut Marshaller<T>) -> Result<Self>;
+    fn encode<Inner>(&self, marshaller: &mut Marshaller<Inner>) -> Result<()>
+    where
+        Inner: AsRef<[u8]> + AsMut<[u8]> + io::Write;
+    fn decode<Inner>(marshaller: &mut Marshaller<Inner>) -> Result<Self>
+    where
+        Inner: AsRef<[u8]> + io::Read;
 }
 
 macro_rules! impl_tuple_packed_type {
@@ -17,12 +21,18 @@ macro_rules! impl_tuple_packed_type {
                 [$($ty::signature()),*].concat()
             }
 
-            fn encode<T: AsRef<[u8]> + io::Write>(&self, marshaller: &mut Marshaller<T>) -> Result<()> {
+            fn encode<Inner>(&self, marshaller: &mut Marshaller<Inner>) -> Result<()>
+            where
+                Inner: AsRef<[u8]> + AsMut<[u8]> + io::Write
+            {
                 $(self.$index.encode(marshaller)?;)*
                 Ok(())
             }
 
-            fn decode<T: AsRef<[u8]> + io::Read>(marshaller: &mut Marshaller<T>) -> Result<Self> {
+            fn decode<Inner>(marshaller: &mut Marshaller<Inner>) -> Result<Self>
+            where
+                Inner: AsRef<[u8]> + io::Read
+            {
                 Ok(($($ty::decode(marshaller)?),*,))
             }
         }

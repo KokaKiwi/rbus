@@ -2,7 +2,8 @@ use super::DeriveTypeDef;
 use super::Fields;
 use crate::utils::DBusMetas;
 use proc_macro2::TokenStream;
-use syn::parse::Result;
+use std::convert::{TryFrom, TryInto};
+use syn::parse::{Error, Result};
 
 #[derive(Debug, Clone)]
 pub struct DeriveStruct {
@@ -35,26 +36,58 @@ impl DeriveStruct {
         self.fields
             .to_vec()
             .into_iter()
-            .map(|(name, _)| quote::quote!(#name))
+            .map(|field| field.name.clone())
             .collect()
     }
 
     fn field_types(&self) -> Vec<&syn::Type> {
-        self.fields.to_vec().into_iter().map(|(_, ty)| ty).collect()
+        self.fields
+            .to_vec()
+            .into_iter()
+            .map(|field| field.ty)
+            .collect()
     }
 
     fn gen_encode_method(&self, ty: &DeriveTypeDef) -> Result<TokenStream> {
         let rbus_module = ty.metas.find_meta_nested("dbus").find_rbus_module("rbus");
         let field_names = self.field_names();
+        let field_extras = self
+            .fields
+            .to_vec()
+            .into_iter()
+            .map(|field| {
+                let dbus = field.metas.find_meta_nested("dbus");
+                let mutate_marshaller = dbus.find_meta_value_str("mutate_marshaller").and_then(
+                    |value| match value {
+                        Some(value) => {
+                            let name = &field.name;
+                            let path: TokenStream = value.parse()?;
+
+                            let tokens = quote::quote! {
+                                #path(&self.#name, marshaller);
+                            };
+
+                            Ok(Some(tokens))
+                        }
+                        None => Ok(None),
+                    },
+                )?;
+
+                Ok(quote::quote! {
+                    #mutate_marshaller
+                })
+            })
+            .collect::<Result<Vec<_>>>()?;
 
         let tokens = quote::quote! {
             fn encode<Inner>(&self, marshaller: &mut #rbus_module::marshal::Marshaller<Inner>) -> #rbus_module::Result<()>
             where
-                Inner: AsRef<[u8]> + std::io::Write
+                Inner: AsRef<[u8]> + AsMut<[u8]> + std::io::Write
             {
                 #(
                     marshaller.write_padding(Self::alignment())?;
                     self.#field_names.encode(marshaller)?;
+                    #(#field_extras)*
                 )*
                 Ok(())
             }
@@ -65,21 +98,52 @@ impl DeriveStruct {
 
     fn gen_decode_method(&self, ty: &DeriveTypeDef) -> Result<TokenStream> {
         let rbus_module = ty.metas.find_meta_nested("dbus").find_rbus_module("rbus");
+        let field_extras = self
+            .fields
+            .to_vec()
+            .into_iter()
+            .map(|field| {
+                let dbus = field.metas.find_meta_nested("dbus");
+                let mutate_marshaller = dbus.find_meta_value_str("mutate_marshaller").and_then(
+                    |value| match value {
+                        Some(value) => {
+                            let name = &field.name;
+                            let path: TokenStream = value.parse()?;
+
+                            let tokens = quote::quote! {
+                                #path(&#name, marshaller);
+                            };
+
+                            Ok(Some(tokens))
+                        }
+                        None => Ok(None),
+                    },
+                )?;
+
+                Ok(quote::quote! {
+                    #mutate_marshaller
+                })
+            })
+            .collect::<Result<Vec<_>>>()?;
 
         let tokens = match self.fields {
             Fields::Named(ref fields) => {
                 let (names, types) = Fields::split_named(&fields);
+                let names = names.as_slice();
 
                 quote::quote! {
                     fn decode<Inner>(marshaller: &mut #rbus_module::marshal::Marshaller<Inner>) -> #rbus_module::Result<Self>
                     where
                         Inner: AsRef<[u8]> + std::io::Read
                     {
+                        #(
+                            marshaller.read_padding(Self::alignment())?;
+                            let #names = <#types>::decode(marshaller)?;
+                            #field_extras
+                        )*
+
                         Ok(Self {
-                            #(#names: {
-                                marshaller.read_padding(Self::alignment())?;
-                                #types::decode(marshaller)?
-                            },)*
+                            #(#names,)*
                         })
                     }
                 }
@@ -94,7 +158,7 @@ impl DeriveStruct {
                     {
                         Ok(Self(#({
                             marshaller.read_padding(Self::alignment())?;
-                            #types::decode(marshaller)?
+                            <#types>::decode(marshaller)?
                         }),*))
                     }
                 }
@@ -113,10 +177,12 @@ impl DeriveStruct {
     }
 }
 
-impl From<syn::DataStruct> for DeriveStruct {
-    fn from(data: syn::DataStruct) -> Self {
-        DeriveStruct {
-            fields: data.fields.into(),
-        }
+impl TryFrom<syn::DataStruct> for DeriveStruct {
+    type Error = Error;
+
+    fn try_from(data: syn::DataStruct) -> Result<Self> {
+        Ok(DeriveStruct {
+            fields: data.fields.try_into()?,
+        })
     }
 }

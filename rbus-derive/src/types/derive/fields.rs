@@ -1,7 +1,10 @@
+use crate::utils::{parse_metas, Metas};
 use proc_macro2::{Span, TokenStream};
+use std::convert::TryFrom;
 use syn::spanned::Spanned;
+use syn::{Error, Result};
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum Fields {
     Named(Vec<NamedField>),
     Unnamed(Vec<UnnamedField>),
@@ -9,10 +12,10 @@ pub enum Fields {
 }
 
 impl Fields {
-    pub fn to_vec(&self) -> Vec<(TokenStream, &syn::Type)> {
+    pub fn to_vec(&self) -> Vec<Field> {
         match self {
-            Fields::Named(fields) => fields.iter().map(NamedField::quoted).collect(),
-            Fields::Unnamed(fields) => fields.iter().map(UnnamedField::quoted).collect(),
+            Fields::Named(fields) => fields.iter().map(Field::from).collect(),
+            Fields::Unnamed(fields) => fields.iter().map(Field::from).collect(),
             Fields::Unit => Vec::new(),
         }
     }
@@ -34,6 +37,13 @@ impl Fields {
         }
     }
 
+    pub fn is_unit(&self) -> bool {
+        match self {
+            Fields::Unit => true,
+            _ => false,
+        }
+    }
+
     pub fn len(&self) -> usize {
         match self {
             Fields::Named(fields) => fields.len(),
@@ -51,7 +61,7 @@ impl Fields {
             let ty = types[0];
             quote::quote!(<#ty>::signature())
         } else {
-            panic!("Unit variant have no signature!")
+            quote::quote!("")
         }
     }
 
@@ -64,24 +74,34 @@ impl Fields {
             let ty = types[0];
             quote::quote!(<#ty>::alignment())
         } else {
-            panic!("Unit variant have no alignment");
+            quote::quote!(0)
         }
     }
 
-    pub fn pat(&self) -> TokenStream {
+    pub fn pat(&self, named: bool) -> TokenStream {
         match self {
             Fields::Named(fields) => {
-                let names = fields.iter().map(|field| &field.name);
+                let names: TokenStream = if named {
+                    let names = fields.iter().map(|field| &field.name);
+                    quote::quote!(#(ref #names),*)
+                } else {
+                    quote::quote!(..)
+                };
 
                 quote::quote! {
-                    {#(ref #names),*}
+                    {#names}
                 }
             }
             Fields::Unnamed(fields) => {
-                let names = fields.iter().map(UnnamedField::pat_name);
+                let names: TokenStream = if named {
+                    let names = fields.iter().map(UnnamedField::pat_name);
+                    quote::quote!(#(ref #names),*)
+                } else {
+                    quote::quote!(..)
+                };
 
                 quote::quote! {
-                    ( #(ref #names),*)
+                    (#names)
                 }
             }
             Fields::Unit => quote::quote!(),
@@ -105,65 +125,101 @@ impl Fields {
     }
 }
 
-impl From<syn::Fields> for Fields {
-    fn from(fields: syn::Fields) -> Fields {
+impl TryFrom<syn::Fields> for Fields {
+    type Error = Error;
+
+    fn try_from(fields: syn::Fields) -> Result<Fields> {
         match fields {
-            syn::Fields::Named(fields) => {
-                let fields = fields.named.iter().cloned().map(NamedField::from).collect();
-
-                Fields::Named(fields)
-            }
-            syn::Fields::Unnamed(fields) => {
-                let fields = fields
-                    .unnamed
-                    .iter()
-                    .cloned()
-                    .enumerate()
-                    .map(UnnamedField::from)
-                    .collect();
-
-                Fields::Unnamed(fields)
-            }
-            syn::Fields::Unit => Fields::Unit,
+            syn::Fields::Named(fields) => fields
+                .named
+                .iter()
+                .cloned()
+                .map(NamedField::from)
+                .collect::<Result<Vec<_>>>()
+                .map(Fields::Named),
+            syn::Fields::Unnamed(fields) => fields
+                .unnamed
+                .iter()
+                .cloned()
+                .enumerate()
+                .map(UnnamedField::from)
+                .collect::<Result<Vec<_>>>()
+                .map(Fields::Unnamed),
+            syn::Fields::Unit => Ok(Fields::Unit),
         }
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
+pub struct Field<'a> {
+    pub metas: &'a Metas,
+    pub span: Span,
+    pub name: TokenStream,
+    pub ty: &'a syn::Type,
+}
+
+impl<'a> From<&'a NamedField> for Field<'a> {
+    fn from(field: &NamedField) -> Field {
+        let name = &field.name;
+
+        Field {
+            metas: &field.metas,
+            span: field.span,
+            name: quote::quote!(#name),
+            ty: &field.ty,
+        }
+    }
+}
+
+impl<'a> From<&'a UnnamedField> for Field<'a> {
+    fn from(field: &UnnamedField) -> Field {
+        let pos = &field.pos;
+
+        Field {
+            metas: &field.metas,
+            span: field.span,
+            name: quote::quote!(#pos),
+            ty: &field.ty,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct NamedField {
+    pub metas: Metas,
+    pub span: Span,
     pub name: syn::Ident,
     pub ty: syn::Type,
 }
 
 impl NamedField {
-    fn from(field: syn::Field) -> NamedField {
-        NamedField {
+    fn from(field: syn::Field) -> Result<NamedField> {
+        Ok(NamedField {
+            metas: parse_metas(field.attrs.clone())?,
+            span: field.span(),
             name: field.ident.unwrap(),
             ty: field.ty,
-        }
-    }
-
-    fn quoted(&self) -> (TokenStream, &syn::Type) {
-        let name = &self.name;
-        (quote::quote!(#name), &self.ty)
+        })
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct UnnamedField {
+    pub metas: Metas,
+    pub span: Span,
     pub pos: syn::LitInt,
     pub ty: syn::Type,
 }
 
 impl UnnamedField {
-    fn from((pos, field): (usize, syn::Field)) -> UnnamedField {
+    fn from((pos, field): (usize, syn::Field)) -> Result<UnnamedField> {
         let pos = syn::LitInt::new(pos as u64, syn::IntSuffix::None, field.span());
-        UnnamedField { pos, ty: field.ty }
-    }
-
-    fn quoted(&self) -> (TokenStream, &syn::Type) {
-        let pos = &self.pos;
-        (quote::quote!(#pos), &self.ty)
+        Ok(UnnamedField {
+            metas: parse_metas(field.attrs.clone())?,
+            span: field.span(),
+            pos,
+            ty: field.ty,
+        })
     }
 
     fn pat_name(&self) -> syn::Ident {

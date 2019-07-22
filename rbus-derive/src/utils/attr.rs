@@ -37,11 +37,23 @@ impl Metas {
             .collect()
     }
 
+    pub fn option(self) -> Option<Metas> {
+        if !self.0.is_empty() {
+            Some(self)
+        } else {
+            None
+        }
+    }
+
     pub fn find_meta<'a>(&'a self, name: &str) -> Option<&'a syn::Meta> {
         self.0.iter().find_map(|nested_meta| match nested_meta {
             syn::NestedMeta::Meta(meta) if meta.name() == name => Some(meta),
             _ => None,
         })
+    }
+
+    pub fn has_meta(&self, name: &str) -> bool {
+        self.find_meta(name).is_some()
     }
 
     pub fn find_metas<'a>(&'a self, name: &str) -> Vec<&'a syn::Meta> {
@@ -171,13 +183,13 @@ impl FromIterator<syn::NestedMeta> for Metas {
 }
 
 impl From<syn::AttributeArgs> for Metas {
-    fn from(value: Vec<syn::NestedMeta>) -> Metas {
+    fn from(value: syn::AttributeArgs) -> Metas {
         Metas(value)
     }
 }
 
 impl From<Option<syn::AttributeArgs>> for Metas {
-    fn from(value: Option<Vec<syn::NestedMeta>>) -> Metas {
+    fn from(value: Option<syn::AttributeArgs>) -> Metas {
         Metas(value.unwrap_or_else(Vec::new))
     }
 }

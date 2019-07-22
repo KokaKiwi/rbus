@@ -70,7 +70,7 @@ impl Method {
         let tokens = quote::quote! {
             fn encode<Inner>(&self, #marshaller: &mut #rbus_module::marshal::Marshaller<Inner>) -> #rbus_module::Result<()>
             where
-                Inner: AsRef<[u8]> + std::io::Write
+                Inner: AsRef<[u8]> + AsMut<[u8]> + std::io::Write
             {
                 use std::io::Write;
 

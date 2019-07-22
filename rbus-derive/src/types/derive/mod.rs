@@ -13,16 +13,6 @@ mod fields;
 mod variants;
 
 #[derive(Debug, Clone)]
-pub struct DeriveTypeDef {
-    pub span: Span,
-    #[allow(dead_code)]
-    pub metas: Metas,
-    pub name: syn::Ident,
-    pub generics: syn::Generics,
-    pub data: DeriveData,
-}
-
-#[derive(Debug, Clone)]
 pub enum DeriveData {
     Enum(DeriveEnum),
     Struct(DeriveStruct),
@@ -54,7 +44,7 @@ impl DeriveData {
 
             fn encode<Inner>(&self, marshaller: &mut #rbus_module::marshal::Marshaller<Inner>) -> #rbus_module::Result<()>
             where
-                Inner: AsRef<[u8]> + std::io::Write
+                Inner: AsRef<[u8]> + AsMut<[u8]> + std::io::Write
             {
                 self.#getter().encode(marshaller)
             }
@@ -77,7 +67,7 @@ impl TryFrom<syn::Data> for DeriveData {
     fn try_from(data: syn::Data) -> Result<DeriveData> {
         let data = match data {
             syn::Data::Enum(data) => DeriveData::Enum(data.try_into()?),
-            syn::Data::Struct(data) => DeriveData::Struct(data.into()),
+            syn::Data::Struct(data) => DeriveData::Struct(data.try_into()?),
             _ => {
                 return Err(syn::Error::new(
                     Span::call_site(),
@@ -88,6 +78,16 @@ impl TryFrom<syn::Data> for DeriveData {
 
         Ok(data)
     }
+}
+
+#[derive(Debug, Clone)]
+pub struct DeriveTypeDef {
+    pub span: Span,
+    #[allow(dead_code)]
+    pub metas: Metas,
+    pub name: syn::Ident,
+    pub generics: syn::Generics,
+    pub data: DeriveData,
 }
 
 impl DeriveTypeDef {
