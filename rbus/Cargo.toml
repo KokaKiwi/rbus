@@ -10,6 +10,7 @@ crate-type = ["lib", "staticlib", "cdylib"]
 [dependencies]
 byteordered = "*"
 custom_error = "*"
+rand = "*"
 rbus-derive = { version = "*", path = "../rbus-derive" }
 
 [build-dependencies]

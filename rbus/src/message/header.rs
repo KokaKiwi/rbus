@@ -17,6 +17,15 @@ impl Endianness {
     }
 }
 
+impl From<BEndianness> for Endianness {
+    fn from(value: BEndianness) -> Endianness {
+        match value {
+            BEndianness::Big => Endianness::Big,
+            BEndianness::Little => Endianness::Little,
+        }
+    }
+}
+
 impl Into<BEndianness> for Endianness {
     fn into(self) -> BEndianness {
         match self {
@@ -30,6 +39,7 @@ impl Into<BEndianness> for Endianness {
 #[dbus(module = "crate")]
 #[repr(u8)]
 pub enum MessageType {
+    #[doc(hidden)]
     Invalid = 0,
     MethodCall = 1,
     MethodReturn = 2,
@@ -50,6 +60,7 @@ bitflags! {
 #[derive(Debug, Clone, PartialEq, DBusType)]
 #[dbus(module = "crate", index(u8))]
 pub enum HeaderField {
+    #[doc(hidden)]
     Invalid,
     Path(ObjectPath),
     Interface(String),
