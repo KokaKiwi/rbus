@@ -122,14 +122,11 @@ impl Metas {
         })
     }
 
-    pub fn find_meta_value_parse<T: Parse>(&self, name: &str) -> Result<T> {
+    pub fn find_meta_value_parse<T: Parse>(&self, name: &str) -> Result<Option<T>> {
         self.find_meta_value_str(name)
             .and_then(|value| match value {
-                Some(value) => value.parse(),
-                None => Err(syn::Error::new(
-                    value.span(),
-                    &format!("Bad value: {:?}", value),
-                )),
+                Some(value) => Some(value.parse()).transpose(),
+                None => Ok(None),
             })
     }
 

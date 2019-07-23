@@ -1,76 +1,61 @@
-use crate::utils::{DBusMetas, Metas};
+use crate::utils::Metas;
 pub use basic::impl_basic_type;
 pub use derive::*;
+pub use gen::ImplGenerator;
 use method::Methods;
-use proc_macro2::TokenStream;
-use std::collections::HashMap;
+use proc_macro2::{Span, TokenStream};
+pub use proxy::gen_proxy_methods;
 use syn::parse::{Parse, ParseStream, Result};
 use syn::spanned::Spanned;
 
 mod basic;
 mod derive;
+mod gen;
 mod method;
+mod proxy;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct TypeDef {
     metas: Metas,
-    generics: Option<syn::Generics>,
+    generics: syn::Generics,
     ty: syn::Type,
     code: Option<syn::LitChar>,
-    where_clause: Option<syn::WhereClause>,
     methods: Methods,
 }
 
 impl TypeDef {
     fn impl_type(self) -> Result<TokenStream> {
-        let ty = &self.ty;
-        let methods = self.gen_methods()?;
-        let generics = self.generics;
-        let where_clause = self.where_clause;
-        let rbus_module = self
-            .metas
-            .find_meta_nested("dbus")
-            .find_rbus_module("crate");
+        let dbus = self.metas.find_meta_nested("dbus");
+        let proxy = dbus.find_meta_nested("proxy");
 
-        let dbus_type_impl = quote::quote! {
-            impl #generics #rbus_module::types::DBusType for #ty #where_clause {
-                #(#methods)*
+        let code_method = self.gen_code_method()?;
+        let signature_method = self.gen_signature_method()?;
+        let alignment_method = self.gen_alignment_method()?;
+
+        let methods = self.methods;
+
+        let mut gen =
+            ImplGenerator::new(Span::call_site(), self.metas, Some(self.generics), self.ty);
+        gen.options.default_rbus_module = "crate".into();
+        gen.options.impl_basic_type = dbus.has_meta_word("basic")?;
+
+        gen.add_method("code", code_method);
+        gen.add_method("signature", signature_method);
+        gen.add_method("alignment", alignment_method);
+
+        if !proxy.is_empty() {
+            let methods = gen_proxy_methods(&gen, Span::call_site(), proxy)?;
+            for (name, method) in methods.into_iter() {
+                gen.add_method(name, method);
             }
-        };
+        }
 
-        let basic_type_impl =
-            if let Ok(true) = self.metas.find_meta_nested("dbus").has_meta_word("basic") {
-                quote::quote! {
-                    impl #generics #rbus_module::types::DBusBasicType for #ty #where_clause {}
-                }
-            } else {
-                quote::quote!()
-            };
+        for method in methods.into_iter() {
+            let (name, method) = method.gen_dbus_method(&gen)?;
+            gen.add_method(name, method);
+        }
 
-        let tokens = quote::quote! {
-            #dbus_type_impl
-            #basic_type_impl
-        };
-
-        Ok(tokens)
-    }
-
-    fn gen_methods(&self) -> Result<Vec<TokenStream>> {
-        let methods: Vec<(String, _)> = vec![
-            ("code".into(), self.gen_code_method()?),
-            ("signature".into(), self.gen_signature_method()?),
-            ("alignment".into(), self.gen_alignment_method()?),
-        ];
-
-        let impl_methods = self
-            .methods
-            .iter()
-            .map(|method| method.gen_dbus_method(&self.metas))
-            .collect::<Result<Vec<_>>>()?;
-
-        let methods: HashMap<_, _> = methods.into_iter().chain(impl_methods).collect();
-        let methods = methods.into_iter().map(|(_, method)| method).collect();
-        Ok(methods)
+        Ok(gen.gen_impl())
     }
 
     fn code(&self) -> char {
@@ -125,14 +110,16 @@ impl TypeDef {
 
 impl Parse for TypeDef {
     fn parse(input: ParseStream) -> Result<Self> {
+        use crate::ext::GenericsExt;
+
         let metas = input.parse()?;
 
-        let generics = if input.peek(syn::Token![impl]) {
+        let mut generics = if input.peek(syn::Token![impl]) {
             input.parse::<syn::Token![impl]>()?;
             let generics = input.parse()?;
-            Some(generics)
+            generics
         } else {
-            None
+            syn::Generics::empty()
         };
 
         let ty = input.parse()?;
@@ -142,7 +129,7 @@ impl Parse for TypeDef {
         } else {
             None
         };
-        let where_clause = input.parse()?;
+        generics.where_clause = input.parse()?;
         let methods = input.call(method::parse_methods)?;
 
         Ok(TypeDef {
@@ -151,7 +138,6 @@ impl Parse for TypeDef {
             ty,
             code,
             methods,
-            where_clause,
         })
     }
 }

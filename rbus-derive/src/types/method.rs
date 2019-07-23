@@ -1,4 +1,4 @@
-use crate::utils::{DBusMetas, Metas};
+use super::ImplGenerator;
 use proc_macro2::TokenStream;
 use quote::ToTokens;
 use syn::parse::{Parse, ParseStream, Result};
@@ -9,10 +9,35 @@ use syn::Error;
 pub type Methods = Vec<Method>;
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct Body(Vec<syn::Stmt>);
+
+impl Parse for Body {
+    fn parse(input: ParseStream) -> Result<Body> {
+        let content;
+        let input = if input.peek(syn::token::Brace) {
+            syn::braced!(content in input);
+            &content
+        } else {
+            input
+        };
+        let stmts = input.call(syn::Block::parse_within)?;
+        Ok(Body(stmts))
+    }
+}
+
+impl quote::ToTokens for Body {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        use quote::TokenStreamExt;
+
+        tokens.append_all(&self.0);
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct Method {
     pub name: syn::Ident,
     pub args: Punctuated<syn::Ident, syn::Token![,]>,
-    pub body: syn::Block,
+    pub body: Body,
 }
 
 impl Method {
@@ -20,87 +45,42 @@ impl Method {
         self.name.to_string()
     }
 
-    pub fn gen_dbus_method(&self, metas: &Metas) -> Result<(String, TokenStream)> {
+    pub fn gen_dbus_method(&self, gen: &ImplGenerator) -> Result<(String, TokenStream)> {
+        let Method { body, .. } = self;
+
         let name = self.name();
         let method = match name.as_str() {
-            "code" => self.gen_code_method(),
-            "signature" => self.gen_signature_method(),
-            "alignment" => self.gen_alignment_method(),
-            "encode" => self.gen_encode_method(metas)?,
-            "decode" => self.gen_decode_method(metas)?,
+            "code" => gen.gen_code_method(body),
+            "signature" => gen.gen_signature_method(body),
+            "alignment" => gen.gen_alignment_method(body),
+            "encode" => self.gen_encode_method(gen)?,
+            "decode" => self.gen_decode_method(gen)?,
             _ => return Err(Error::new(self.name.span(), "Invalid DBusType method name")),
         };
 
         Ok((name, method))
     }
 
-    fn gen_code_method(&self) -> TokenStream {
-        let Method { body, .. } = self;
-
-        quote::quote! {
-            fn code() -> u8 #body
-        }
-    }
-
-    fn gen_signature_method(&self) -> TokenStream {
-        let Method { body, .. } = self;
-
-        quote::quote! {
-            fn signature() -> String #body
-        }
-    }
-
-    fn gen_alignment_method(&self) -> TokenStream {
-        let Method { body, .. } = self;
-
-        quote::quote! {
-            fn alignment() -> u8 #body
-        }
-    }
-
-    fn gen_encode_method(&self, metas: &Metas) -> Result<TokenStream> {
+    fn gen_encode_method(&self, gen: &ImplGenerator) -> Result<TokenStream> {
         let Method { args, body, .. } = self;
         let marshaller = args
             .first()
             .map(|pair| pair.into_value())
+            .cloned()
             .ok_or_else(|| Error::new(args.span(), "Not enough arguments"))?;
 
-        let rbus_module = metas.find_rbus_module("crate");
-
-        let tokens = quote::quote! {
-            fn encode<Inner>(&self, #marshaller: &mut #rbus_module::marshal::Marshaller<Inner>) -> #rbus_module::Result<()>
-            where
-                Inner: AsRef<[u8]> + AsMut<[u8]> + std::io::Write
-            {
-                use std::io::Write;
-
-                #body
-            }
-        };
-
-        Ok(tokens)
+        Ok(gen.gen_encode_method(marshaller, body))
     }
 
-    fn gen_decode_method(&self, metas: &Metas) -> Result<TokenStream> {
+    fn gen_decode_method(&self, gen: &ImplGenerator) -> Result<TokenStream> {
         let Method { args, body, .. } = self;
         let marshaller = args
             .first()
             .map(|pair| pair.into_value())
+            .cloned()
             .ok_or_else(|| Error::new(args.span(), "Not enough arguments"))?;
 
-        let rbus_module = metas.find_rbus_module("crate");
-
-        let tokens = quote::quote! {
-            fn decode<Inner>(#marshaller: &mut #rbus_module::marshal::Marshaller<Inner>) -> #rbus_module::Result<Self>
-            where
-                Inner: AsRef<[u8]> + std::io::Read
-            {
-                use std::io::Read;
-                #body
-            }
-        };
-
-        Ok(tokens)
+        Ok(gen.gen_decode_method(marshaller, body))
     }
 }
 
@@ -121,7 +101,7 @@ impl ToTokens for Method {
         let Method { name, args, body } = self;
 
         tokens.extend(quote::quote! {
-            #name(#args) #body
+            #name(#args) { #body }
         });
     }
 }

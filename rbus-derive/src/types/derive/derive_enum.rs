@@ -1,6 +1,5 @@
-use super::DeriveTypeDef;
-use super::{Fields, Variant, Variants};
-use crate::utils::{DBusMetas, Metas};
+use super::{DeriveTypeDef, Fields, ImplGenerator, ImplMethods, Variant, Variants};
+use crate::utils::Metas;
 use proc_macro2::TokenStream;
 use std::convert::TryFrom;
 use syn::parse::Result;
@@ -12,18 +11,18 @@ pub struct DeriveEnum {
 }
 
 impl DeriveEnum {
-    pub fn gen_body(&self, ty: &DeriveTypeDef) -> Result<TokenStream> {
+    pub fn gen_methods(&self, ty: &DeriveTypeDef, gen: &ImplGenerator) -> Result<ImplMethods> {
         if self.variants.is_complete() {
-            Ok(self.gen_complete_body(ty))
+            Ok(self.gen_complete_methods(ty, gen))
         } else if self.variants.is_unit() {
-            self.gen_unit_body(ty)
+            self.gen_unit_methods(ty, gen)
         } else if let Some(index) = ty
             .metas
             .find_meta_nested("dbus")
             .find_meta_nested("index")
             .option()
         {
-            self.gen_index_body(ty, index)
+            self.gen_index_methods(ty, gen, index)
         } else {
             Err(syn::Error::new(
                 ty.span,
@@ -32,24 +31,21 @@ impl DeriveEnum {
         }
     }
 
-    fn gen_complete_body(&self, ty: &DeriveTypeDef) -> TokenStream {
-        let encode_method = self.gen_encode_method(ty);
-        let decode_method = self.gen_decode_method(ty);
-
-        let body = quote::quote! {
-            fn code() -> u8 { b'v' }
-            fn signature() -> String { "v".into() }
-            fn alignment() -> u8 { 1 }
-
-            #encode_method
-            #decode_method
-        };
-
-        body
+    fn gen_complete_methods(&self, ty: &DeriveTypeDef, gen: &ImplGenerator) -> ImplMethods {
+        vec![
+            ("code", gen.gen_code_method(quote::quote!(b'v'))),
+            (
+                "signature",
+                gen.gen_signature_method(quote::quote!("v".into())),
+            ),
+            ("alignment", gen.gen_alignment_method(quote::quote!(1))),
+            ("encode", self.gen_encode_method(ty, gen)),
+            ("decode", self.gen_decode_method(ty, gen)),
+        ]
     }
 
-    fn gen_unit_body(&self, ty: &DeriveTypeDef) -> Result<TokenStream> {
-        let rbus_module = ty.metas.find_meta_nested("dbus").find_rbus_module("rbus");
+    fn gen_unit_methods(&self, ty: &DeriveTypeDef, gen: &ImplGenerator) -> Result<ImplMethods> {
+        let rbus_module = gen.rbus_module();
         let repr: syn::Ident = ty
             .metas
             .find_meta_nested("repr")
@@ -63,35 +59,30 @@ impl DeriveEnum {
         let variant_names = self.variants.iter().map(|variant| &variant.name);
         let values = self.variants.values();
 
-        let tokens = quote::quote! {
-            fn code() -> u8 { <#repr>::code() }
-            fn signature() -> String { <#repr>::signature() }
-            fn alignment() -> u8 { <#repr>::alignment() }
-
-            fn encode<Inner>(&self, marshaller: &mut #rbus_module::marshal::Marshaller<Inner>) -> #rbus_module::Result<()>
-            where
-                Inner: AsRef<[u8]> + AsMut<[u8]> + std::io::Write
-            {
-                (*self as #repr).encode(marshaller)
-            }
-
-            fn decode<Inner>(marshaller: &mut #rbus_module::marshal::Marshaller<Inner>) -> #rbus_module::Result<Self>
-            where
-                Inner: AsRef<[u8]> + std::io::Read
-            {
-                let value = <#repr>::decode(marshaller)?;
+        Ok(vec![
+           ("code", gen.gen_code_method(quote::quote!(#repr::code()))),
+           ("signature", gen.gen_signature_method(quote::quote!(#repr::signature()))),
+           ("alignment", gen.gen_alignment_method(quote::quote!(#repr::alignment()))),
+           ("encode", gen.gen_encode_method(syn::parse_quote!(marshaller),
+           quote::quote!((*self as #repr).encode(marshaller)))),
+           ("decode", gen.gen_decode_method(syn::parse_quote!(marshaller),
+           quote::quote! {
+                let value = #repr::decode(marshaller)?;
                 match value {
                     #(#values => Ok(#ty_names::#variant_names),)*
-                    value => Err(#rbus_module::Error::InvalidVariant { value: value as u64, }),
+                    value => Err(#rbus_module::Error::InvalidVariant { value: value as u64 }),
                 }
-            }
-        };
-
-        Ok(tokens)
+           })),
+        ])
     }
 
-    fn gen_index_body(&self, ty: &DeriveTypeDef, index: Metas) -> Result<TokenStream> {
-        let rbus_module = ty.metas.find_meta_nested("dbus").find_rbus_module("rbus");
+    fn gen_index_methods(
+        &self,
+        ty: &DeriveTypeDef,
+        gen: &ImplGenerator,
+        index: Metas,
+    ) -> Result<ImplMethods> {
+        let rbus_module = gen.rbus_module();
         let index_ty =
             index.words().first().cloned().ok_or_else(|| {
                 syn::Error::new(ty.span, "Unit-only enums must have a fixed repr")
@@ -126,64 +117,64 @@ impl DeriveEnum {
             })
             .collect();
 
-        let tokens = quote::quote! {
-            fn code() -> u8 { b'r' }
-            fn signature() -> String { format!("({}v)", <#index_ty>::signature()) }
-            fn alignment() -> u8 { 8 }
+        Ok(vec![
+            ("code", gen.gen_code_method(quote::quote!(b'r'))),
+            (
+                "signature",
+                gen.gen_signature_method(quote::quote!(format!("({}v)", <#index_ty>::signature()))),
+            ),
+            ("alignment", gen.gen_alignment_method(quote::quote!(8))),
+            (
+                "encode",
+                gen.gen_encode_method(
+                    syn::parse_quote!(marshaller),
+                    quote::quote! {
+                        use #rbus_module::types::Signature;
 
-            fn encode<Inner>(&self, marshaller: &mut #rbus_module::marshal::Marshaller<Inner>) -> #rbus_module::Result<()>
-            where
-                Inner: AsRef<[u8]> + AsMut<[u8]> + std::io::Write
-            {
-                use #rbus_module::types::Signature;
+                        match self {
+                            #variant_encodes
+                        }
+                    },
+                ),
+            ),
+            (
+                "decode",
+                gen.gen_decode_method(
+                    syn::parse_quote!(marshaller),
+                    quote::quote! {
+                        use #rbus_module::types::Signature;
 
-                match self {
-                    #variant_encodes
-                }
-            }
+                        let value = marshaller.io().read_u8()?;
 
-            fn decode<Inner>(marshaller: &mut #rbus_module::marshal::Marshaller<Inner>) -> #rbus_module::Result<Self>
-            where
-                Inner: AsRef<[u8]> + std::io::Read
-            {
-                use #rbus_module::types::Signature;
+                        let signature = Signature::decode(marshaller)?;
+                        let signature = signature.as_str();
 
-                let value = marshaller.io().read_u8()?;
-
-                let signature = Signature::decode(marshaller)?;
-                let signature = signature.as_str();
-
-                #variant_decodes
-                Err(#rbus_module::Error::Custom {
-                    message: "Bad variant value".into(),
-                })
-            }
-        };
-
-        Ok(tokens)
+                        #variant_decodes
+                        Err(#rbus_module::Error::Custom {
+                            message: "Bad variant value".into(),
+                        })
+                    },
+                ),
+            ),
+        ])
     }
 
-    fn gen_encode_method(&self, ty: &DeriveTypeDef) -> TokenStream {
-        let rbus_module = ty.metas.find_meta_nested("dbus").find_rbus_module("rbus");
+    fn gen_encode_method(&self, ty: &DeriveTypeDef, gen: &ImplGenerator) -> TokenStream {
+        let rbus_module = gen.rbus_module();
         let variants = self.variants.iter().map(|variant| {
             let body = self.gen_encode_variant_body(variant);
             self.gen_encode_variant(ty, variant, body)
         });
 
-        let tokens = quote::quote! {
-            fn encode<Inner>(&self, marshaller: &mut #rbus_module::marshal::Marshaller<Inner>) -> #rbus_module::Result<()>
-            where
-                Inner: AsRef<[u8]> + AsMut<[u8]> + std::io::Write
-            {
-                use #rbus_module::types::Signature;
+        let body = quote::quote! {
+            use #rbus_module::types::Signature;
 
-                match self {
-                    #(#variants)*
-                }
+            match self {
+                #(#variants)*
             }
         };
 
-        tokens
+        gen.gen_encode_method(syn::parse_quote!(marshaller), body)
     }
 
     fn gen_encode_variant(
@@ -224,31 +215,26 @@ impl DeriveEnum {
         tokens
     }
 
-    fn gen_decode_method(&self, ty: &DeriveTypeDef) -> TokenStream {
-        let rbus_module = ty.metas.find_meta_nested("dbus").find_rbus_module("rbus");
+    fn gen_decode_method(&self, ty: &DeriveTypeDef, gen: &ImplGenerator) -> TokenStream {
+        let rbus_module = gen.rbus_module();
         let variants = self.variants.iter().map(|variant| {
             let body = self.gen_decode_variant_body(ty, variant);
             self.gen_decode_variant(variant, body)
         });
 
-        let tokens = quote::quote! {
-            fn decode<Inner>(marshaller: &mut #rbus_module::marshal::Marshaller<Inner>) -> #rbus_module::Result<Self>
-            where
-                Inner: AsRef<[u8]> + std::io::Read
-            {
-                use #rbus_module::types::Signature;
+        let body = quote::quote! {
+            use #rbus_module::types::Signature;
 
-                let signature = Signature::decode(marshaller)?;
-                let signature = signature.as_str();
+            let signature = Signature::decode(marshaller)?;
+            let signature = signature.as_str();
 
-                #(#variants)*
-                Err(#rbus_module::Error::Custom {
-                    message: "Bad variant value".into(),
-                })
-            }
+            #(#variants)*
+            Err(#rbus_module::Error::Custom {
+                message: "Bad variant value".into(),
+            })
         };
 
-        tokens
+        gen.gen_decode_method(syn::parse_quote!(marshaller), body)
     }
 
     fn gen_decode_variant(&self, variant: &Variant, body: TokenStream) -> TokenStream {

@@ -5,10 +5,10 @@ use syn::ext::IdentExt;
 pub trait DBusMetas {
     fn metas(&self) -> &Metas;
 
-    fn find_rbus_module(&self, default: &str) -> syn::Ident {
+    fn find_rbus_module<T: AsRef<str>>(&self, default: T) -> syn::Ident {
         self.metas()
             .find_meta_value_parse_with("module", syn::Ident::parse_any)
-            .unwrap_or_else(|_| syn::Ident::new(default, Span::call_site()))
+            .unwrap_or_else(|_| syn::Ident::new(default.as_ref(), Span::call_site()))
     }
 }
 

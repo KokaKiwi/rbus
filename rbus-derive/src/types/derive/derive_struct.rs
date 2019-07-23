@@ -1,6 +1,4 @@
-use super::DeriveTypeDef;
-use super::Fields;
-use crate::utils::DBusMetas;
+use super::{Fields, ImplGenerator, ImplMethods};
 use proc_macro2::TokenStream;
 use std::convert::{TryFrom, TryInto};
 use syn::parse::{Error, Result};
@@ -11,25 +9,25 @@ pub struct DeriveStruct {
 }
 
 impl DeriveStruct {
-    pub fn gen_body(&self, ty: &DeriveTypeDef) -> Result<TokenStream> {
+    pub fn gen_methods(&self, gen: &ImplGenerator) -> Result<ImplMethods> {
         let field_types = self.field_types();
         let signature_format_str = format!("({})", "{}".repeat(field_types.len()));
 
-        let encode_method = self.gen_encode_method(ty)?;
-        let decode_method = self.gen_decode_method(ty)?;
+        let encode_method = self.gen_encode_method(gen)?;
+        let decode_method = self.gen_decode_method(gen)?;
 
-        let body = quote::quote! {
-            fn code() -> u8 { b'r' }
-            fn signature() -> String {
-                format!(#signature_format_str, #(<#field_types>::signature()),*)
-            }
-            fn alignment() -> u8 { 8 }
-
-            #encode_method
-            #decode_method
-        };
-
-        Ok(body)
+        Ok(vec![
+            ("code", gen.gen_code_method(quote::quote!(b'r'))),
+            (
+                "signature",
+                gen.gen_signature_method(quote::quote! {
+                    format!(#signature_format_str, #(<#field_types>::signature()),*)
+                }),
+            ),
+            ("alignment", gen.gen_alignment_method(quote::quote!(8))),
+            ("encode", encode_method),
+            ("decode", decode_method),
+        ])
     }
 
     fn field_names(&self) -> Vec<TokenStream> {
@@ -48,8 +46,7 @@ impl DeriveStruct {
             .collect()
     }
 
-    fn gen_encode_method(&self, ty: &DeriveTypeDef) -> Result<TokenStream> {
-        let rbus_module = ty.metas.find_meta_nested("dbus").find_rbus_module("rbus");
+    fn gen_encode_method(&self, gen: &ImplGenerator) -> Result<TokenStream> {
         let field_names = self.field_names();
         let field_extras = self
             .fields
@@ -79,25 +76,19 @@ impl DeriveStruct {
             })
             .collect::<Result<Vec<_>>>()?;
 
-        let tokens = quote::quote! {
-            fn encode<Inner>(&self, marshaller: &mut #rbus_module::marshal::Marshaller<Inner>) -> #rbus_module::Result<()>
-            where
-                Inner: AsRef<[u8]> + AsMut<[u8]> + std::io::Write
-            {
-                #(
-                    marshaller.write_padding(Self::alignment())?;
-                    self.#field_names.encode(marshaller)?;
-                    #(#field_extras)*
-                )*
-                Ok(())
-            }
+        let body = quote::quote! {
+            #(
+                marshaller.write_padding(Self::alignment())?;
+                self.#field_names.encode(marshaller)?;
+                #(#field_extras)*
+            )*
+            Ok(())
         };
 
-        Ok(tokens)
+        Ok(gen.gen_encode_method(syn::parse_quote!(marshaller), body))
     }
 
-    fn gen_decode_method(&self, ty: &DeriveTypeDef) -> Result<TokenStream> {
-        let rbus_module = ty.metas.find_meta_nested("dbus").find_rbus_module("rbus");
+    fn gen_decode_method(&self, gen: &ImplGenerator) -> Result<TokenStream> {
         let field_extras = self
             .fields
             .to_vec()
@@ -126,54 +117,39 @@ impl DeriveStruct {
             })
             .collect::<Result<Vec<_>>>()?;
 
-        let tokens = match self.fields {
+        let body = match self.fields {
             Fields::Named(ref fields) => {
                 let (names, types) = Fields::split_named(&fields);
                 let names = names.as_slice();
 
                 quote::quote! {
-                    fn decode<Inner>(marshaller: &mut #rbus_module::marshal::Marshaller<Inner>) -> #rbus_module::Result<Self>
-                    where
-                        Inner: AsRef<[u8]> + std::io::Read
-                    {
-                        #(
-                            marshaller.read_padding(Self::alignment())?;
-                            let #names = <#types>::decode(marshaller)?;
-                            #field_extras
-                        )*
+                    #(
+                        marshaller.read_padding(Self::alignment())?;
+                        let #names = <#types>::decode(marshaller)?;
+                        #field_extras
+                    )*
 
-                        Ok(Self {
-                            #(#names,)*
-                        })
-                    }
+                    Ok(Self {
+                        #(#names,)*
+                    })
                 }
             }
             Fields::Unnamed(ref fields) => {
                 let types = fields.iter().map(|field| &field.ty);
 
                 quote::quote! {
-                    fn decode<Inner>(marshaller: &mut #rbus_module::marshal::Marshaller<Inner>) -> #rbus_module::Result<Self>
-                    where
-                        Inner: AsRef<[u8]> + std::io::Read
-                    {
-                        Ok(Self(#({
-                            marshaller.read_padding(Self::alignment())?;
-                            <#types>::decode(marshaller)?
-                        }),*))
-                    }
+                    Ok(Self(#({
+                        marshaller.read_padding(Self::alignment())?;
+                        <#types>::decode(marshaller)?
+                    }),*))
                 }
             }
             Fields::Unit => quote::quote! {
-                fn decode<Inner>(_marshaller: &mut #rbus_module::marshal::Marshaller<Inner>) -> #rbus_module::Result<Self>
-                where
-                    Inner: AsRef<[u8]> + std::io::Read
-                {
-                    Ok(Self)
-                }
+                Ok(Self)
             },
         };
 
-        Ok(tokens)
+        Ok(gen.gen_decode_method(syn::parse_quote!(marshaller), body))
     }
 }
 
