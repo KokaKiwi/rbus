@@ -1,38 +1,34 @@
 use crate::marshal::Marshaller;
-use crate::types::{DBusType, ObjectPath, Signature};
+use crate::types::{impl_type, DBusType, ObjectPath, Signature};
 use bitflags::bitflags;
-use byteordered::Endianness as BEndianness;
+use byteordered::Endianness;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, DBusType)]
-#[dbus(module = "crate")]
-#[repr(u8)]
-pub enum Endianness {
-    Big = b'B',
-    Little = b'l',
-}
+impl_type! {
+    #[dbus(proxy(u8))]
+    Endianness {
+        encode(marshaller) {
+            let value = match *self {
+                Endianness::Little => b'l',
+                Endianness::Big => b'B',
+            };
+            value.encode(marshaller)
+        }
 
-impl Endianness {
-    fn mutate_marshaller<T>(&self, marshaller: &mut Marshaller<T>) {
-        marshaller.endianness = (*self).into();
-    }
-}
+        decode(marshaller) {
+            use crate::Error;
 
-impl From<BEndianness> for Endianness {
-    fn from(value: BEndianness) -> Endianness {
-        match value {
-            BEndianness::Big => Endianness::Big,
-            BEndianness::Little => Endianness::Little,
+            let value = marshaller.io().read_u8()?;
+            match value {
+                b'l' => Ok(Endianness::Little),
+                b'B' => Ok(Endianness::Big),
+                _ => Err(Error::InvalidEndianness { value }),
+            }
         }
     }
 }
 
-impl Into<BEndianness> for Endianness {
-    fn into(self) -> BEndianness {
-        match self {
-            Endianness::Big => BEndianness::Big,
-            Endianness::Little => BEndianness::Little,
-        }
-    }
+fn mutate_marshaller<T>(endianness: &Endianness, marshaller: &mut Marshaller<T>) {
+    marshaller.endianness = *endianness;
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, DBusType)]
@@ -49,7 +45,7 @@ pub enum MessageType {
 
 bitflags! {
     #[derive(DBusType)]
-    #[dbus(module = "crate", proxy(ty = "u8", get = "bits", set = "from_bits_truncate"))]
+    #[dbus(module = "crate", proxy(u8, get = "bits", set = "from_bits_truncate"))]
     pub struct Flags: u8 {
         const NO_REPLY_EXPECTED                 = 0x1;
         const NO_AUTO_START                     = 0x2;
@@ -76,7 +72,7 @@ pub enum HeaderField {
 #[derive(Debug, Clone, PartialEq, DBusType)]
 #[dbus(module = "crate")]
 pub struct MessageHeader {
-    #[dbus(mutate_marshaller = "Endianness::mutate_marshaller")]
+    #[dbus(mutate_marshaller = "mutate_marshaller")]
     pub endianness: Endianness,
     pub ty: MessageType,
     pub flags: Flags,

@@ -1,4 +1,3 @@
-use crate::marshal::Marshaller;
 use crate::types::DBusType;
 pub use builder::*;
 pub use header::*;

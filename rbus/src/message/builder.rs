@@ -1,7 +1,7 @@
 use super::*;
 use crate::error::*;
 use crate::types::*;
-use byteordered::Endianness as ByteEndianness;
+use byteordered::Endianness;
 use std::num::NonZeroU32;
 
 pub struct MessageBuilder<T: DBusType> {
@@ -17,7 +17,7 @@ pub struct MessageBuilder<T: DBusType> {
 impl<T: DBusType> MessageBuilder<T> {
     pub(super) fn new(data: T) -> MessageBuilder<T> {
         MessageBuilder {
-            endianness: ByteEndianness::native().into(),
+            endianness: Endianness::native(),
             ty: MessageType::Invalid,
             flags: Flags::empty(),
             version: 1,
@@ -38,6 +38,10 @@ impl<T: DBusType> MessageBuilder<T> {
     pub fn add_signature(&mut self) {
         let signature = Signature::new(T::signature()).unwrap();
         self.add_field(HeaderField::Signature(signature));
+    }
+
+    pub fn serial(&mut self) -> u32 {
+        self.serial.get()
     }
 
     pub fn build(self) -> Result<Message<T>> {
@@ -61,6 +65,8 @@ impl<T: DBusType> MessageBuilder<T> {
     }
 
     fn encode_data(&self) -> Result<Vec<u8>> {
+        use crate::marshal::Marshaller;
+
         let mut marshaller = Marshaller::new_native(Vec::new());
         self.data.encode(&mut marshaller)?;
         Ok(marshaller.into_vec())

@@ -16,6 +16,8 @@ custom_error! {
             = "Object path error: {source}",
         InvalidVariant { value: u64 }
             = "Invalid variant value: {value}",
+        InvalidEndianness { value: u8 }
+            = "Invalid endianness value: {value}",
         Custom { message: String }
             = "{message}",
         Unknown
