@@ -25,7 +25,7 @@ macro_rules! impl_tuple_packed_type {
             where
                 Inner: AsRef<[u8]> + AsMut<[u8]> + io::Write
             {
-                $(self.$index.encode(marshaller)?;)*
+                $(marshaller.write_value(&self.$index)?;)*
                 Ok(())
             }
 
@@ -33,7 +33,7 @@ macro_rules! impl_tuple_packed_type {
             where
                 Inner: AsRef<[u8]> + io::Read
             {
-                Ok(($($ty::decode(marshaller)?),*,))
+                Ok(($(marshaller.read_value::<$ty>()?),*,))
             }
         }
     }
