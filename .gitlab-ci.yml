@@ -7,6 +7,7 @@ compile:rust-stable:
   stage: compile
   script:
     - cargo build -j 2
+  when: manual
   cache:
     key: $CI_COMMIT_REF_SLUG:$RUST_KEY
     paths:
@@ -24,6 +25,7 @@ compile:rust-stable-musl:
   stage: compile
   script:
     - cargo build -j 2
+  when: manual
   cache:
     key: $CI_COMMIT_REF_SLUG:$RUST_KEY
     paths:
@@ -41,6 +43,7 @@ compile:rust-beta:
   stage: compile
   script:
     - cargo build -j 2
+  when: manual
   cache:
     key: $CI_COMMIT_REF_SLUG:$RUST_KEY
     paths:
@@ -58,6 +61,7 @@ compile:rust-beta-musl:
   stage: compile
   script:
     - cargo build -j 2
+  when: manual
   cache:
     key: $CI_COMMIT_REF_SLUG:$RUST_KEY
     paths:
@@ -75,6 +79,7 @@ compile:rust-nightly:
   stage: compile
   script:
     - cargo build -j 2
+  when: manual
   cache:
     key: $CI_COMMIT_REF_SLUG:$RUST_KEY
     paths:
@@ -93,6 +98,7 @@ compile:rust-nightly-musl:
   stage: compile
   script:
     - cargo build -j 2
+  when: manual
   cache:
     key: $CI_COMMIT_REF_SLUG:$RUST_KEY
     paths:
@@ -113,6 +119,7 @@ test:rust-stable:
     - compile:rust-stable
   script:
     - cargo test
+  when: manual
   variables:
     RUST_KEY: rust-stable
 
@@ -123,6 +130,7 @@ test:rust-stable-musl:
     - compile:rust-stable-musl
   script:
     - cargo test
+  when: manual
   variables:
     RUST_KEY: rust-stable-musl
 
@@ -133,6 +141,7 @@ test:rust-beta:
     - compile:rust-beta
   script:
     - cargo test
+  when: manual
   variables:
     RUST_KEY: rust-beta
 
@@ -143,6 +152,7 @@ test:rust-beta-musl:
     - compile:rust-beta-musl
   script:
     - cargo test
+  when: manual
   variables:
     RUST_KEY: rust-beta-musl
 
@@ -153,6 +163,7 @@ test:rust-nightly:
     - compile:rust-nightly
   script:
     - cargo test
+  when: manual
   variables:
     RUST_KEY: rust-nightly
   allow_failure: true
@@ -164,6 +175,7 @@ test:rust-nightly-musl:
     - compile:rust-nightly-musl
   script:
     - cargo test
+  when: manual
   variables:
     RUST_KEY: rust-nightly-musl
   allow_failure: true
