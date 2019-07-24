@@ -1,4 +1,5 @@
 use super::ImplGenerator;
+use crate::utils::Metas;
 use proc_macro2::TokenStream;
 use quote::ToTokens;
 use syn::parse::{Parse, ParseStream, Result};
@@ -35,6 +36,7 @@ impl quote::ToTokens for Body {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Method {
+    pub metas: Metas,
     pub name: syn::Ident,
     pub args: Punctuated<syn::Ident, syn::Token![,]>,
     pub body: Body,
@@ -46,13 +48,13 @@ impl Method {
     }
 
     pub fn gen_dbus_method(&self, gen: &ImplGenerator) -> Result<(String, TokenStream)> {
-        let Method { body, .. } = self;
+        let Method { metas, body, .. } = self;
 
         let name = self.name();
         let method = match name.as_str() {
-            "code" => gen.gen_code_method(body),
-            "signature" => gen.gen_signature_method(body),
-            "alignment" => gen.gen_alignment_method(body),
+            "code" => gen.gen_code_method(body, Some(metas)),
+            "signature" => gen.gen_signature_method(body, Some(metas)),
+            "alignment" => gen.gen_alignment_method(body, Some(metas)),
             "encode" => self.gen_encode_method(gen)?,
             "decode" => self.gen_decode_method(gen)?,
             _ => return Err(Error::new(self.name.span(), "Invalid DBusType method name")),
@@ -62,46 +64,64 @@ impl Method {
     }
 
     fn gen_encode_method(&self, gen: &ImplGenerator) -> Result<TokenStream> {
-        let Method { args, body, .. } = self;
+        let Method {
+            metas, args, body, ..
+        } = self;
         let marshaller = args
             .first()
             .map(|pair| pair.into_value())
             .cloned()
             .ok_or_else(|| Error::new(args.span(), "Not enough arguments"))?;
 
-        Ok(gen.gen_encode_method(marshaller, body))
+        Ok(gen.gen_encode_method(marshaller, body, Some(metas)))
     }
 
     fn gen_decode_method(&self, gen: &ImplGenerator) -> Result<TokenStream> {
-        let Method { args, body, .. } = self;
+        let Method {
+            metas, args, body, ..
+        } = self;
         let marshaller = args
             .first()
             .map(|pair| pair.into_value())
             .cloned()
             .ok_or_else(|| Error::new(args.span(), "Not enough arguments"))?;
 
-        Ok(gen.gen_decode_method(marshaller, body))
+        Ok(gen.gen_decode_method(marshaller, body, Some(metas)))
     }
 }
 
 impl Parse for Method {
     fn parse(input: ParseStream) -> Result<Method> {
-        let content;
+        let metas = input.parse()?;
         let name = input.parse()?;
+        let content;
         syn::parenthesized!(content in input);
         let args = content.parse_terminated(syn::Ident::parse)?;
         let body = input.parse()?;
 
-        Ok(Method { name, args, body })
+        Ok(Method {
+            metas,
+            name,
+            args,
+            body,
+        })
     }
 }
 
 impl ToTokens for Method {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        let Method { name, args, body } = self;
+        let Method {
+            metas,
+            name,
+            args,
+            body,
+        } = self;
 
         tokens.extend(quote::quote! {
-            #name(#args) { #body }
+            #metas
+            #name(#args) {
+                #body
+            }
         });
     }
 }
@@ -112,8 +132,7 @@ pub fn parse_methods(input: ParseStream) -> Result<Methods> {
         syn::braced!(content in input);
 
         let mut methods = Vec::new();
-        while content.peek(syn::Ident) {
-            let method = content.parse()?;
+        while let Ok(method) = content.parse() {
             methods.push(method);
         }
         methods

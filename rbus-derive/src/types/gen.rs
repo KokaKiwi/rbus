@@ -3,17 +3,18 @@ use crate::utils::{DBusMetas, Metas};
 use proc_macro2::{Span, TokenStream};
 use quote::ToTokens;
 use std::collections::HashMap;
+use syn::{Error, Result};
+
+const DBUS_TYPE_METHOD_NAMES: &[&str] = &["code", "signature", "alignment", "encode", "decode"];
 
 pub struct ImplGeneratorOptions {
     pub default_rbus_module: String,
-    pub impl_basic_type: bool,
 }
 
 impl Default for ImplGeneratorOptions {
     fn default() -> ImplGeneratorOptions {
         ImplGeneratorOptions {
             default_rbus_module: "rbus".into(),
-            impl_basic_type: false,
         }
     }
 }
@@ -68,53 +69,81 @@ impl ImplGenerator {
             .find_rbus_module(&self.options.default_rbus_module)
     }
 
-    pub fn add_method<T: Into<String>>(&mut self, name: T, method: TokenStream) {
-        self.methods.insert(name.into(), method);
+    pub fn is_packed(&self) -> bool {
+        self.dbus.has_word("packed")
     }
 
-    pub fn gen_impl(self) -> TokenStream {
-        let rbus_module = self
-            .dbus
-            .find_rbus_module(&self.options.default_rbus_module);
+    pub fn is_basic(&self) -> bool {
+        self.dbus.has_word("basic")
+    }
+
+    pub fn add_method<T: Into<String>>(&mut self, name: T, method: TokenStream) {
+        let name = name.into();
+        let accept_names = DBUS_TYPE_METHOD_NAMES;
+
+        if accept_names.contains(&name.as_str()) {
+            self.methods.insert(name.into(), method);
+        }
+    }
+
+    pub fn gen_impl(self) -> Result<TokenStream> {
+        let rbus_module = self.rbus_module();
         let (impl_generics, _, where_clause) = self.generics.split_for_impl();
         let ty = &self.ty;
 
-        let methods = self.methods.into_iter().map(|entry| entry.1);
+        let methods = DBUS_TYPE_METHOD_NAMES
+            .iter()
+            .map(|&name| {
+                self.methods
+                    .get(name)
+                    .ok_or_else(|| Error::new(self.span, format!("")))
+            })
+            .collect::<Result<Vec<_>>>()?;
 
-        let dbus_type_impl = quote::quote! {
+        let mut tokens = quote::quote! {
             impl #impl_generics #rbus_module::types::DBusType for #ty #where_clause {
                 #(#methods)*
             }
         };
 
-        let basic_type_impl = if let Ok(true) = self.dbus.has_meta_word("basic") {
-            quote::quote! {
+        if self.is_basic() && !self.is_packed() {
+            tokens.extend(quote::quote! {
                 impl #impl_generics #rbus_module::types::DBusBasicType for #ty #where_clause {}
-            }
-        } else {
-            quote::quote!()
-        };
-
-        quote::quote! {
-            #dbus_type_impl
-            #basic_type_impl
+            });
         }
+
+        Ok(tokens)
     }
 
-    pub fn gen_code_method<Body: ToTokens>(&self, body: Body) -> TokenStream {
+    pub fn gen_code_method<Body: ToTokens>(
+        &self,
+        body: Body,
+        metas: Option<&Metas>,
+    ) -> TokenStream {
         quote::quote! {
+            #metas
             fn code() -> u8 { #body }
         }
     }
 
-    pub fn gen_signature_method<Body: ToTokens>(&self, body: Body) -> TokenStream {
+    pub fn gen_signature_method<Body: ToTokens>(
+        &self,
+        body: Body,
+        metas: Option<&Metas>,
+    ) -> TokenStream {
         quote::quote! {
+            #metas
             fn signature() -> String { #body }
         }
     }
 
-    pub fn gen_alignment_method<Body: ToTokens>(&self, body: Body) -> TokenStream {
+    pub fn gen_alignment_method<Body: ToTokens>(
+        &self,
+        body: Body,
+        metas: Option<&Metas>,
+    ) -> TokenStream {
         quote::quote! {
+            #metas
             fn alignment() -> u8 { #body }
         }
     }
@@ -123,14 +152,16 @@ impl ImplGenerator {
         &self,
         marshaller: syn::Ident,
         body: Body,
+        metas: Option<&Metas>,
     ) -> TokenStream {
         let rbus_module = self.rbus_module();
 
         quote::quote! {
+            #metas
             fn encode<Inner>(&self, #marshaller: &mut #rbus_module::marshal::Marshaller<Inner>)
                 -> #rbus_module::Result<()>
             where
-                Inner: AsRef<[u8]> + AsMut<[u8]> + std::io::Write
+                Inner: std::io::Write
             {
                 use std::io::Write;
 
@@ -143,14 +174,16 @@ impl ImplGenerator {
         &self,
         marshaller: syn::Ident,
         body: Body,
+        metas: Option<&Metas>,
     ) -> TokenStream {
         let rbus_module = self.rbus_module();
 
         quote::quote! {
+            #metas
             fn decode<Inner>(#marshaller: &mut #rbus_module::marshal::Marshaller<Inner>)
                 -> #rbus_module::Result<Self>
             where
-                Inner: AsRef<[u8]> + std::io::Read
+                Inner: std::io::Read
             {
                 use std::io::Read;
 

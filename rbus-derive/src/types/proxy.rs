@@ -8,9 +8,9 @@ pub fn gen_proxy_methods(
     span: Span,
     proxy: Metas,
 ) -> Result<Vec<(&'static str, TokenStream)>> {
-    let words = proxy.words();
-    let proxy_ty = words
-        .first()
+    let proxy_ty = proxy
+        .words()
+        .next()
         .ok_or_else(|| syn::Error::new(span, "You must define a proxy type"))?;
     let getter: TokenStream = proxy
         .find_meta_value_parse::<syn::Ident>("get")?
@@ -24,21 +24,22 @@ pub fn gen_proxy_methods(
     Ok(vec![
         (
             "code",
-            gen.gen_code_method(quote::quote!(<#proxy_ty>::code())),
+            gen.gen_code_method(quote::quote!(<#proxy_ty>::code()), None),
         ),
         (
             "signature",
-            gen.gen_signature_method(quote::quote!(<#proxy_ty>::signature())),
+            gen.gen_signature_method(quote::quote!(<#proxy_ty>::signature()), None),
         ),
         (
             "alignment",
-            gen.gen_alignment_method(quote::quote!(<#proxy_ty>::alignment())),
+            gen.gen_alignment_method(quote::quote!(<#proxy_ty>::alignment()), None),
         ),
         (
             "encode",
             gen.gen_encode_method(
                 syn::parse_quote!(marshaller),
                 quote::quote!(#getter.encode(marshaller)),
+                None,
             ),
         ),
         (
@@ -49,6 +50,7 @@ pub fn gen_proxy_methods(
                     let value = <#proxy_ty>::decode(marshaller)?;
                     Ok(#setter)
                 },
+                None,
             ),
         ),
     ])

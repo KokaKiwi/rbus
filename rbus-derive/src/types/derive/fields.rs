@@ -94,7 +94,7 @@ impl Fields {
             }
             Fields::Unnamed(fields) => {
                 let names: TokenStream = if named {
-                    let names = fields.iter().map(UnnamedField::pat_name);
+                    let names = fields.iter().map(UnnamedField::binding);
                     quote::quote!(#(ref #names),*)
                 } else {
                     quote::quote!(..)
@@ -108,10 +108,30 @@ impl Fields {
         }
     }
 
+    pub fn bindings(&self) -> TokenStream {
+        match self {
+            Fields::Named(fields) => {
+                let names = fields.iter().map(|field| &field.name);
+
+                quote::quote! {
+                    {#(#names),*}
+                }
+            }
+            Fields::Unnamed(fields) => {
+                let names = fields.iter().map(UnnamedField::binding);
+
+                quote::quote! {
+                    (#(#names),*)
+                }
+            }
+            Fields::Unit => quote::quote!(),
+        }
+    }
+
     pub fn pat_names(&self) -> Vec<syn::Ident> {
         match self {
             Fields::Named(fields) => fields.iter().map(|field| field.name.clone()).collect(),
-            Fields::Unnamed(fields) => fields.iter().map(UnnamedField::pat_name).collect(),
+            Fields::Unnamed(fields) => fields.iter().map(UnnamedField::binding).collect(),
             Fields::Unit => vec![],
         }
     }
@@ -155,7 +175,14 @@ pub struct Field<'a> {
     pub metas: &'a Metas,
     pub span: Span,
     pub name: TokenStream,
+    pub binding: syn::Ident,
     pub ty: &'a syn::Type,
+}
+
+impl<'a> Field<'a> {
+    pub fn dbus(&self) -> Metas {
+        self.metas.find_meta_nested("dbus")
+    }
 }
 
 impl<'a> From<&'a NamedField> for Field<'a> {
@@ -166,6 +193,7 @@ impl<'a> From<&'a NamedField> for Field<'a> {
             metas: &field.metas,
             span: field.span,
             name: quote::quote!(#name),
+            binding: field.binding(),
             ty: &field.ty,
         }
     }
@@ -179,6 +207,7 @@ impl<'a> From<&'a UnnamedField> for Field<'a> {
             metas: &field.metas,
             span: field.span,
             name: quote::quote!(#pos),
+            binding: field.binding(),
             ty: &field.ty,
         }
     }
@@ -201,6 +230,10 @@ impl NamedField {
             ty: field.ty,
         })
     }
+
+    fn binding(&self) -> syn::Ident {
+        self.name.clone()
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -222,7 +255,7 @@ impl UnnamedField {
         })
     }
 
-    fn pat_name(&self) -> syn::Ident {
+    fn binding(&self) -> syn::Ident {
         let name = format!("_field_{}", self.pos.value());
         syn::Ident::new(&name, self.pos.span())
     }

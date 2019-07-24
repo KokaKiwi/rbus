@@ -37,7 +37,6 @@ impl TypeDef {
         let mut gen =
             ImplGenerator::new(Span::call_site(), self.metas, Some(self.generics), self.ty);
         gen.options.default_rbus_module = "crate".into();
-        gen.options.impl_basic_type = dbus.has_meta_word("basic")?;
 
         gen.add_method("code", code_method);
         gen.add_method("signature", signature_method);
@@ -55,7 +54,7 @@ impl TypeDef {
             gen.add_method(name, method);
         }
 
-        Ok(gen.gen_impl())
+        gen.gen_impl()
     }
 
     fn code(&self) -> char {

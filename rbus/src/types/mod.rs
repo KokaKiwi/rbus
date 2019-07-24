@@ -7,7 +7,6 @@ pub use dict::*;
 pub use rbus_derive::{impl_type, DBusType};
 use std::io;
 pub use string::*;
-pub use tuple::*;
 
 mod array;
 mod basic;
@@ -22,10 +21,10 @@ pub trait DBusType: Sized {
 
     fn encode<Inner>(&self, marshaller: &mut Marshaller<Inner>) -> Result<()>
     where
-        Inner: AsRef<[u8]> + AsMut<[u8]> + io::Write;
+        Inner: io::Write;
     fn decode<Inner>(marshaller: &mut Marshaller<Inner>) -> Result<Self>
     where
-        Inner: AsRef<[u8]> + io::Read;
+        Inner: io::Read;
 }
 
 impl_type! {
@@ -52,22 +51,6 @@ impl_type! {
             Err(Error::Custom {
                 message: "References cannot be decoded".into(),
             })
-        }
-    }
-}
-
-impl_type! {
-    () {
-        signature() {
-            "".into()
-        }
-
-        encode(_marshaller) {
-            Ok(())
-        }
-
-        decode(_marshaller) {
-            Ok(())
         }
     }
 }

@@ -15,7 +15,7 @@ impl_type! {
             for value in self.iter() {
                 inner.write_value(value)?;
             }
-            let data = inner.into_vec();
+            let data = inner.into_inner();
 
             marshaller.io().write_u32(data.len() as u32)?;
             marshaller.write_padding(T::alignment())?;

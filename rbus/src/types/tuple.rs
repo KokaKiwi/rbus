@@ -1,52 +1,39 @@
-use super::DBusType;
-use crate::marshal::Marshaller;
-use crate::Result;
-use std::io;
+use super::{impl_type, DBusType};
 
-pub trait DBusPackedTypes: Sized {
-    fn signature() -> String;
-
-    fn encode<Inner>(&self, marshaller: &mut Marshaller<Inner>) -> Result<()>
-    where
-        Inner: AsRef<[u8]> + AsMut<[u8]> + io::Write;
-    fn decode<Inner>(marshaller: &mut Marshaller<Inner>) -> Result<Self>
-    where
-        Inner: AsRef<[u8]> + io::Read;
-}
-
-macro_rules! impl_tuple_packed_type {
+macro_rules! impl_tuple_dbus_type {
     ($($index:tt: $ty:ident),*) => {
-        impl<$($ty: DBusType),*> DBusPackedTypes for ($($ty),*,) {
-            fn signature() -> String {
-                [$($ty::signature()),*].concat()
-            }
+        impl_type! {
+            #[dbus(packed, align = 1)]
+            impl<$($ty: DBusType),*> ($($ty,)*) {
+                signature() {
+                    let signatures: &[String] = &[$(<$ty>::signature()),*];
+                    signatures.concat()
+                }
 
-            fn encode<Inner>(&self, marshaller: &mut Marshaller<Inner>) -> Result<()>
-            where
-                Inner: AsRef<[u8]> + AsMut<[u8]> + io::Write
-            {
-                $(marshaller.write_value(&self.$index)?;)*
-                Ok(())
-            }
+                #[allow(unused_variables)]
+                encode(marshaller) {
+                    $(marshaller.write_value(&self.$index)?;)*
+                    Ok(())
+                }
 
-            fn decode<Inner>(marshaller: &mut Marshaller<Inner>) -> Result<Self>
-            where
-                Inner: AsRef<[u8]> + io::Read
-            {
-                Ok(($(marshaller.read_value::<$ty>()?),*,))
+                #[allow(unused_variables)]
+                decode(marshaller) {
+                    Ok(($(marshaller.read_value::<$ty>()?,)*))
+                }
             }
         }
     }
 }
 
-impl_tuple_packed_type!(0: A);
-impl_tuple_packed_type!(0: A, 1: B);
-impl_tuple_packed_type!(0: A, 1: B, 2: C);
-impl_tuple_packed_type!(0: A, 1: B, 2: C, 3: D);
-impl_tuple_packed_type!(0: A, 1: B, 2: C, 3: D, 4: E);
-impl_tuple_packed_type!(0: A, 1: B, 2: C, 3: D, 4: E, 5: F);
-impl_tuple_packed_type!(0: A, 1: B, 2: C, 3: D, 4: E, 5: F, 6: G);
-impl_tuple_packed_type!(0: A, 1: B, 2: C, 3: D, 4: E, 5: F, 6: G, 7: H);
+impl_tuple_dbus_type!();
+impl_tuple_dbus_type!(0: A);
+impl_tuple_dbus_type!(0: A, 1: B);
+impl_tuple_dbus_type!(0: A, 1: B, 2: C);
+impl_tuple_dbus_type!(0: A, 1: B, 2: C, 3: D);
+impl_tuple_dbus_type!(0: A, 1: B, 2: C, 3: D, 4: E);
+impl_tuple_dbus_type!(0: A, 1: B, 2: C, 3: D, 4: E, 5: F);
+impl_tuple_dbus_type!(0: A, 1: B, 2: C, 3: D, 4: E, 5: F, 6: G);
+impl_tuple_dbus_type!(0: A, 1: B, 2: C, 3: D, 4: E, 5: F, 6: G, 7: H);
 
 #[cfg(test)]
 mod tests {

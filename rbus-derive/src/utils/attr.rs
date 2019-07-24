@@ -1,3 +1,5 @@
+use proc_macro2::TokenStream;
+use quote::{ToTokens, TokenStreamExt};
 use std::iter::FromIterator;
 use syn::parse::{Parse, ParseStream, Parser, Result};
 use syn::spanned::Spanned;
@@ -7,34 +9,29 @@ pub struct Metas(syn::AttributeArgs);
 
 #[allow(dead_code)]
 impl Metas {
-    pub fn values(&self) -> Vec<&syn::Lit> {
-        self.0
-            .iter()
-            .filter_map(|nested_meta| match nested_meta {
-                syn::NestedMeta::Literal(lit) => Some(lit),
-                _ => None,
-            })
-            .collect()
+    pub fn values(&self) -> impl Iterator<Item = &syn::Lit> {
+        self.0.iter().filter_map(|nested_meta| match nested_meta {
+            syn::NestedMeta::Literal(lit) => Some(lit),
+            _ => None,
+        })
     }
 
-    pub fn metas(&self) -> Vec<&syn::Meta> {
-        self.0
-            .iter()
-            .filter_map(|nested_meta| match nested_meta {
-                syn::NestedMeta::Meta(meta) => Some(meta),
-                _ => None,
-            })
-            .collect()
+    pub fn metas(&self) -> impl Iterator<Item = &syn::Meta> {
+        self.0.iter().filter_map(|nested_meta| match nested_meta {
+            syn::NestedMeta::Meta(meta) => Some(meta),
+            _ => None,
+        })
     }
 
-    pub fn words(&self) -> Vec<&syn::Ident> {
-        self.metas()
-            .into_iter()
-            .filter_map(|meta| match meta {
-                syn::Meta::Word(ident) => Some(ident),
-                _ => None,
-            })
-            .collect()
+    pub fn words(&self) -> impl Iterator<Item = &syn::Ident> {
+        self.metas().filter_map(|meta| match meta {
+            syn::Meta::Word(ident) => Some(ident),
+            _ => None,
+        })
+    }
+
+    pub fn has_word(&self, name: &str) -> bool {
+        self.words().any(|ident| ident == name)
     }
 
     pub fn option(self) -> Option<Metas> {
@@ -74,17 +71,6 @@ impl Metas {
                 _ => None,
             })
             .collect()
-    }
-
-    pub fn has_meta_word(&self, name: &str) -> Result<bool> {
-        match self.find_meta(name) {
-            Some(syn::Meta::Word(_)) => Ok(true),
-            Some(meta) => Err(syn::Error::new(
-                meta.span(),
-                format!("Expected ident: `{}`", name),
-            )),
-            None => Ok(false),
-        }
     }
 
     pub fn find_meta_nested(&self, name: &str) -> Metas {
@@ -196,6 +182,14 @@ impl Parse for Metas {
         input
             .call(syn::Attribute::parse_outer)
             .and_then(parse_metas)
+    }
+}
+
+impl ToTokens for Metas {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        for meta in self.metas() {
+            tokens.append_all(quote::quote!(#[#meta]));
+        }
     }
 }
 

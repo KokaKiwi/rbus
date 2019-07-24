@@ -69,6 +69,6 @@ impl<T: DBusType> MessageBuilder<T> {
 
         let mut marshaller = Marshaller::new_native(Vec::new());
         self.data.encode(&mut marshaller)?;
-        Ok(marshaller.into_vec())
+        Ok(marshaller.into_inner())
     }
 }

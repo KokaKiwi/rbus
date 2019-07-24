@@ -81,7 +81,7 @@ impl DeriveTypeDef {
             gen.add_method(name, method);
         }
 
-        Ok(gen.gen_impl())
+        gen.gen_impl()
     }
 
     fn gen_generics(&self) -> Result<syn::Generics> {

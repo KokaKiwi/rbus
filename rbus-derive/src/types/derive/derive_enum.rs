@@ -33,12 +33,15 @@ impl DeriveEnum {
 
     fn gen_complete_methods(&self, ty: &DeriveTypeDef, gen: &ImplGenerator) -> ImplMethods {
         vec![
-            ("code", gen.gen_code_method(quote::quote!(b'v'))),
+            ("code", gen.gen_code_method(quote::quote!(b'v'), None)),
             (
                 "signature",
-                gen.gen_signature_method(quote::quote!("v".into())),
+                gen.gen_signature_method(quote::quote!("v".into()), None),
             ),
-            ("alignment", gen.gen_alignment_method(quote::quote!(1))),
+            (
+                "alignment",
+                gen.gen_alignment_method(quote::quote!(1), None),
+            ),
             ("encode", self.gen_encode_method(ty, gen)),
             ("decode", self.gen_decode_method(ty, gen)),
         ]
@@ -50,8 +53,7 @@ impl DeriveEnum {
             .metas
             .find_meta_nested("repr")
             .words()
-            .first()
-            .cloned()
+            .next()
             .cloned()
             .ok_or_else(|| syn::Error::new(ty.span, "Unit-only enums must have a fixed repr"))?;
 
@@ -60,19 +62,19 @@ impl DeriveEnum {
         let values = self.variants.values();
 
         Ok(vec![
-           ("code", gen.gen_code_method(quote::quote!(#repr::code()))),
-           ("signature", gen.gen_signature_method(quote::quote!(#repr::signature()))),
-           ("alignment", gen.gen_alignment_method(quote::quote!(#repr::alignment()))),
-           ("encode", gen.gen_encode_method(syn::parse_quote!(marshaller),
-           quote::quote!((*self as #repr).encode(marshaller)))),
-           ("decode", gen.gen_decode_method(syn::parse_quote!(marshaller),
-           quote::quote! {
+           ("code", gen.gen_code_method(quote::quote!(#repr::code()), None)),
+           ("signature", gen.gen_signature_method(quote::quote!(#repr::signature()), None)),
+           ("alignment", gen.gen_alignment_method(quote::quote!(#repr::alignment()), None)),
+           ("encode",
+            gen.gen_encode_method(syn::parse_quote!(marshaller), quote::quote!((*self as #repr).encode(marshaller)), None)),
+           ("decode",
+            gen.gen_decode_method(syn::parse_quote!(marshaller), quote::quote! {
                 let value = #repr::decode(marshaller)?;
                 match value {
                     #(#values => Ok(#ty_names::#variant_names),)*
                     value => Err(#rbus_module::Error::InvalidVariant { value: value as u64 }),
                 }
-           })),
+           }, None)),
         ])
     }
 
@@ -84,7 +86,7 @@ impl DeriveEnum {
     ) -> Result<ImplMethods> {
         let rbus_module = gen.rbus_module();
         let index_ty =
-            index.words().first().cloned().ok_or_else(|| {
+            index.words().next().cloned().ok_or_else(|| {
                 syn::Error::new(ty.span, "Unit-only enums must have a fixed repr")
             })?;
         let indexes = self.variants.indexes()?;
@@ -118,12 +120,18 @@ impl DeriveEnum {
             .collect();
 
         Ok(vec![
-            ("code", gen.gen_code_method(quote::quote!(b'r'))),
+            ("code", gen.gen_code_method(quote::quote!(b'r'), None)),
             (
                 "signature",
-                gen.gen_signature_method(quote::quote!(format!("({}v)", <#index_ty>::signature()))),
+                gen.gen_signature_method(
+                    quote::quote!(format!("({}v)", <#index_ty>::signature())),
+                    None,
+                ),
             ),
-            ("alignment", gen.gen_alignment_method(quote::quote!(8))),
+            (
+                "alignment",
+                gen.gen_alignment_method(quote::quote!(8), None),
+            ),
             (
                 "encode",
                 gen.gen_encode_method(
@@ -135,6 +143,7 @@ impl DeriveEnum {
                             #variant_encodes
                         }
                     },
+                    None,
                 ),
             ),
             (
@@ -154,6 +163,7 @@ impl DeriveEnum {
                             message: "Bad variant value".into(),
                         })
                     },
+                    None,
                 ),
             ),
         ])
@@ -174,7 +184,7 @@ impl DeriveEnum {
             }
         };
 
-        gen.gen_encode_method(syn::parse_quote!(marshaller), body)
+        gen.gen_encode_method(syn::parse_quote!(marshaller), body, None)
     }
 
     fn gen_encode_variant(
@@ -234,7 +244,7 @@ impl DeriveEnum {
             })
         };
 
-        gen.gen_decode_method(syn::parse_quote!(marshaller), body)
+        gen.gen_decode_method(syn::parse_quote!(marshaller), body, None)
     }
 
     fn gen_decode_variant(&self, variant: &Variant, body: TokenStream) -> TokenStream {

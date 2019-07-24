@@ -70,7 +70,7 @@ pub enum HeaderField {
 }
 
 #[derive(Debug, Clone, PartialEq, DBusType)]
-#[dbus(module = "crate")]
+#[dbus(packed, module = "crate")]
 pub struct MessageHeader {
     #[dbus(mutate_marshaller = "mutate_marshaller")]
     pub endianness: Endianness,
