@@ -1,7 +1,7 @@
 use crate::{types::DBusType, Result};
 use byteordered::ByteOrdered;
 pub use byteordered::Endianness;
-use cursor::Cursor;
+pub use cursor::Cursor;
 use std::{
     io::{self, Read, Write},
     ops::Deref,

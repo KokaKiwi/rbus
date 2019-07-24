@@ -72,7 +72,7 @@ pub enum HeaderField {
 }
 
 #[derive(Debug, Clone, PartialEq, DBusType)]
-#[dbus(packed, module = "crate")]
+#[dbus(packed, module = "crate", size(align = 8))]
 pub struct MessageHeader {
     #[dbus(mutate_marshaller = "mutate_marshaller")]
     pub endianness: Endianness,
@@ -108,7 +108,7 @@ mod tests {
             1, b'u', 0, // Variant value
             0, // 8-bytes boundary
         ];
-        assert_eq!(bytes.len() % 8, 0);
+        assert_eq!(bytes.len() % 8, 0); // Header must be 8-bytes aligned
 
         let mut marshaller = Marshaller::new_native(bytes);
         let header = MessageHeader::decode(&mut marshaller).unwrap();

@@ -89,10 +89,16 @@ impl DeriveStruct {
             })
             .collect::<Result<Vec<_>>>()?;
 
-        let body = quote::quote! {
-            #(#fields)*
-            Ok(())
+        let mut body = quote::quote!(#(#fields)*);
+
+        let size = gen.dbus.find_meta_nested("size");
+        if let Some(value) = size.find_meta_value_int("align")? {
+            body.extend(quote::quote! {
+                marshaller.write_padding(#value)?;
+            });
         };
+
+        body.extend(quote::quote!(Ok(())));
 
         Ok(gen.gen_encode_method(syn::parse_quote!(marshaller), body, None))
     }
@@ -106,7 +112,12 @@ impl DeriveStruct {
                 let dbus = field.dbus();
                 let mut tokens = TokenStream::new();
 
-                if !gen.is_packed() {
+                if gen.is_packed() {
+                    let ty = field.ty;
+                    tokens.extend(quote::quote! {
+                        marshaller.read_padding(<#ty>::alignment())?;
+                    });
+                } else {
                     tokens.extend(quote::quote! {
                         marshaller.read_padding(Self::alignment())?;
                     });
@@ -131,10 +142,16 @@ impl DeriveStruct {
             .collect::<Result<Vec<_>>>()?;
         let bindings = self.fields.bindings();
 
-        let body = quote::quote! {
-            #(#fields)*
-            Ok(Self #bindings)
+        let mut body = quote::quote!(#(#fields)*);
+
+        let size = gen.dbus.find_meta_nested("size");
+        if let Some(value) = size.find_meta_value_int("align")? {
+            body.extend(quote::quote! {
+                marshaller.read_padding(#value)?;
+            });
         };
+
+        body.extend(quote::quote!(Ok(Self #bindings)));
 
         Ok(gen.gen_decode_method(syn::parse_quote!(marshaller), body, None))
     }

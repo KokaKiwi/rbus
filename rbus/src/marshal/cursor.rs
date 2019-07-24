@@ -16,13 +16,18 @@ impl<T> Cursor<T> {
     }
 
     #[inline]
+    fn padding(offset: usize, alignment: usize) -> usize {
+        (alignment - (offset % alignment)) % alignment
+    }
+
+    #[inline]
     pub fn write_position(&self) -> usize {
         self.write_pos
     }
 
     #[inline]
     pub fn write_padding(&self, alignment: usize) -> usize {
-        self.write_pos % alignment
+        Self::padding(self.write_pos, alignment)
     }
 
     #[inline]
@@ -32,7 +37,7 @@ impl<T> Cursor<T> {
 
     #[inline]
     pub fn read_padding(&self, alignment: usize) -> usize {
-        self.read_pos % alignment
+        Self::padding(self.read_pos, alignment)
     }
 
     #[inline]
