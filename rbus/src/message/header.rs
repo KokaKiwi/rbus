@@ -1,5 +1,7 @@
-use crate::marshal::Marshaller;
-use crate::types::{impl_type, DBusType, ObjectPath, Signature};
+use crate::{
+    marshal::Marshaller,
+    types::{impl_type, DBusType, ObjectPath, Signature},
+};
 use bitflags::bitflags;
 use byteordered::Endianness;
 
@@ -104,10 +106,13 @@ mod tests {
             8,    // Signature
             1, b'g', 0, // Variant signature
             1, b'u', 0, // Variant value
+            0, // 8-bytes boundary
         ];
+        assert_eq!(bytes.len() % 8, 0);
 
         let mut marshaller = Marshaller::new_native(bytes);
         let header = MessageHeader::decode(&mut marshaller).unwrap();
+        let rest = marshaller.into_inner();
 
         let value = MessageHeader {
             endianness: Endianness::Big,
@@ -123,5 +128,6 @@ mod tests {
         };
 
         assert_eq!(header, value);
+        assert_eq!(rest.len(), 0);
     }
 }

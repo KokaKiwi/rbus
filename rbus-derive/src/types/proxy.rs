@@ -3,11 +3,7 @@ use crate::utils::Metas;
 use proc_macro2::{Span, TokenStream};
 use syn::Result;
 
-pub fn gen_proxy_methods(
-    gen: &ImplGenerator,
-    span: Span,
-    proxy: Metas,
-) -> Result<Vec<(&'static str, TokenStream)>> {
+pub fn gen_proxy_methods(gen: &ImplGenerator, span: Span, proxy: Metas) -> Result<Vec<(&'static str, TokenStream)>> {
     let proxy_ty = proxy
         .words()
         .next()
@@ -22,10 +18,7 @@ pub fn gen_proxy_methods(
         .unwrap_or_else(|| quote::quote!(value));
 
     Ok(vec![
-        (
-            "code",
-            gen.gen_code_method(quote::quote!(<#proxy_ty>::code()), None),
-        ),
+        ("code", gen.gen_code_method(quote::quote!(<#proxy_ty>::code()), None)),
         (
             "signature",
             gen.gen_signature_method(quote::quote!(<#proxy_ty>::signature()), None),

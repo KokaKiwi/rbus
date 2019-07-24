@@ -1,5 +1,4 @@
-use crate::marshal::Marshaller;
-use crate::Result;
+use crate::{marshal::Marshaller, Result};
 pub use array::*;
 pub use basic::*;
 pub use dict::*;

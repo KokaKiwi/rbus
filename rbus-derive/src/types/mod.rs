@@ -5,8 +5,10 @@ pub use gen::ImplGenerator;
 use method::Methods;
 use proc_macro2::{Span, TokenStream};
 pub use proxy::gen_proxy_methods;
-use syn::parse::{Parse, ParseStream, Result};
-use syn::spanned::Spanned;
+use syn::{
+    parse::{Parse, ParseStream, Result},
+    spanned::Spanned,
+};
 
 mod basic;
 mod derive;
@@ -34,8 +36,7 @@ impl TypeDef {
 
         let methods = self.methods;
 
-        let mut gen =
-            ImplGenerator::new(Span::call_site(), self.metas, Some(self.generics), self.ty);
+        let mut gen = ImplGenerator::new(Span::call_site(), self.metas, Some(self.generics), self.ty);
         gen.options.default_rbus_module = "crate".into();
 
         gen.add_method("code", code_method);
@@ -83,21 +84,10 @@ impl TypeDef {
     }
 
     fn gen_alignment_method(&self) -> Result<TokenStream> {
-        let alignment = match self
-            .metas
-            .find_meta_nested("dbus")
-            .find_meta_value("align")?
-        {
+        let alignment = match self.metas.find_meta_nested("dbus").find_meta_value("align")? {
             Some(syn::Lit::Int(lit)) => quote::quote!(#lit as u8),
-            Some(syn::Lit::Str(lit)) if lit.value() == "size" => {
-                quote::quote!(std::mem::size_of::<Self>() as u8)
-            }
-            Some(lit) => {
-                return Err(syn::Error::new(
-                    lit.span(),
-                    "Bad align value, only integer or \"size\"",
-                ))
-            }
+            Some(syn::Lit::Str(lit)) if lit.value() == "size" => quote::quote!(std::mem::size_of::<Self>() as u8),
+            Some(lit) => return Err(syn::Error::new(lit.span(), "Bad align value, only integer or \"size\"")),
             None => quote::quote!(1),
         };
 

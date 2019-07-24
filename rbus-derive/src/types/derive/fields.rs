@@ -1,8 +1,7 @@
 use crate::utils::{parse_metas, Metas};
 use proc_macro2::{Span, TokenStream};
 use std::convert::TryFrom;
-use syn::spanned::Spanned;
-use syn::{Error, Result};
+use syn::{spanned::Spanned, Error, Result};
 
 #[derive(Debug, Clone)]
 pub enum Fields {

@@ -1,7 +1,9 @@
 use super::method::{parse_methods, Methods};
 use proc_macro2::TokenStream;
-use syn::parse::{Parse, ParseStream, Result};
-use syn::spanned::Spanned;
+use syn::{
+    parse::{Parse, ParseStream, Result},
+    spanned::Spanned,
+};
 
 pub struct BasicTypeDef {
     attrs: Vec<syn::Attribute>,

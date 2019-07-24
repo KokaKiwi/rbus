@@ -1,16 +1,15 @@
 use super::Fields;
 use crate::utils::{parse_metas, Metas};
 use proc_macro2::Span;
-use std::convert::TryFrom;
-use std::ops::Deref;
-use syn::spanned::Spanned;
-use syn::Result;
+use std::{convert::TryFrom, ops::Deref};
+use syn::{spanned::Spanned, Result};
 
 #[derive(Debug, Clone)]
 pub struct Variants(Vec<Variant>);
 
 impl Variants {
-    /// Return true if all variant fields are named or unnamed and false if otherwise
+    /// Return true if all variant fields are named or unnamed and false if
+    /// otherwise
     pub fn is_complete(&self) -> bool {
         self.0.iter().all(|variant| !variant.fields.is_unit())
     }

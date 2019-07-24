@@ -1,10 +1,11 @@
-use crate::types::DBusType;
-use crate::Result;
+use crate::{types::DBusType, Result};
 use byteordered::ByteOrdered;
 pub use byteordered::Endianness;
 use cursor::Cursor;
-use std::io::{self, Read, Write};
-use std::ops::Deref;
+use std::{
+    io::{self, Read, Write},
+    ops::Deref,
+};
 
 mod cursor;
 

@@ -1,9 +1,6 @@
 use super::{DBusBasicType, DBusType};
 use rbus_derive::impl_type;
-use std::collections::HashMap;
-use std::hash::Hash;
-use std::iter::FromIterator;
-use std::ops::Deref;
+use std::{collections::HashMap, hash::Hash, iter::FromIterator, ops::Deref};
 
 // Dict (list of dict entries)
 #[derive(Debug, Clone, PartialEq)]

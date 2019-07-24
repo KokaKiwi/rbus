@@ -1,6 +1,5 @@
 use super::*;
-use crate::error::*;
-use crate::types::*;
+use crate::{error::*, types::*};
 use byteordered::Endianness;
 use std::num::NonZeroU32;
 

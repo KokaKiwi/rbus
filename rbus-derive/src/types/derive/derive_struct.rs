@@ -49,11 +49,7 @@ impl DeriveStruct {
     }
 
     fn field_types(&self) -> Vec<&syn::Type> {
-        self.fields
-            .to_vec()
-            .into_iter()
-            .map(|field| field.ty)
-            .collect()
+        self.fields.to_vec().into_iter().map(|field| field.ty).collect()
     }
 
     fn gen_encode_method(&self, gen: &ImplGenerator) -> Result<TokenStream> {

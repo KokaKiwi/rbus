@@ -1,5 +1,7 @@
-use crate::ext::GenericsExt;
-use crate::utils::{DBusMetas, Metas};
+use crate::{
+    ext::GenericsExt,
+    utils::{DBusMetas, Metas},
+};
 use proc_macro2::{Span, TokenStream};
 use quote::ToTokens;
 use std::collections::HashMap;
@@ -30,12 +32,7 @@ pub struct ImplGenerator {
 }
 
 impl ImplGenerator {
-    pub fn new(
-        span: Span,
-        metas: Metas,
-        generics: Option<syn::Generics>,
-        ty: syn::Type,
-    ) -> ImplGenerator {
+    pub fn new(span: Span, metas: Metas, generics: Option<syn::Generics>, ty: syn::Type) -> ImplGenerator {
         let dbus = metas.find_meta_nested("dbus");
         let generics = generics.unwrap_or_else(syn::Generics::empty);
 
@@ -50,12 +47,7 @@ impl ImplGenerator {
         }
     }
 
-    pub fn new_ident(
-        span: Span,
-        metas: Metas,
-        generics: Option<syn::Generics>,
-        ty: syn::Ident,
-    ) -> ImplGenerator {
+    pub fn new_ident(span: Span, metas: Metas, generics: Option<syn::Generics>, ty: syn::Ident) -> ImplGenerator {
         let generics = generics.unwrap_or_else(syn::Generics::empty);
         let (_, type_generics, _) = generics.split_for_impl();
 
@@ -65,8 +57,7 @@ impl ImplGenerator {
     }
 
     pub fn rbus_module(&self) -> syn::Ident {
-        self.dbus
-            .find_rbus_module(&self.options.default_rbus_module)
+        self.dbus.find_rbus_module(&self.options.default_rbus_module)
     }
 
     pub fn is_packed(&self) -> bool {
@@ -93,11 +84,7 @@ impl ImplGenerator {
 
         let methods = DBUS_TYPE_METHOD_NAMES
             .iter()
-            .map(|&name| {
-                self.methods
-                    .get(name)
-                    .ok_or_else(|| Error::new(self.span, format!("")))
-            })
+            .map(|&name| self.methods.get(name).ok_or_else(|| Error::new(self.span, format!(""))))
             .collect::<Result<Vec<_>>>()?;
 
         let mut tokens = quote::quote! {
@@ -115,33 +102,21 @@ impl ImplGenerator {
         Ok(tokens)
     }
 
-    pub fn gen_code_method<Body: ToTokens>(
-        &self,
-        body: Body,
-        metas: Option<&Metas>,
-    ) -> TokenStream {
+    pub fn gen_code_method<Body: ToTokens>(&self, body: Body, metas: Option<&Metas>) -> TokenStream {
         quote::quote! {
             #metas
             fn code() -> u8 { #body }
         }
     }
 
-    pub fn gen_signature_method<Body: ToTokens>(
-        &self,
-        body: Body,
-        metas: Option<&Metas>,
-    ) -> TokenStream {
+    pub fn gen_signature_method<Body: ToTokens>(&self, body: Body, metas: Option<&Metas>) -> TokenStream {
         quote::quote! {
             #metas
             fn signature() -> String { #body }
         }
     }
 
-    pub fn gen_alignment_method<Body: ToTokens>(
-        &self,
-        body: Body,
-        metas: Option<&Metas>,
-    ) -> TokenStream {
+    pub fn gen_alignment_method<Body: ToTokens>(&self, body: Body, metas: Option<&Metas>) -> TokenStream {
         quote::quote! {
             #metas
             fn alignment() -> u8 { #body }

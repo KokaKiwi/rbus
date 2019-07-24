@@ -2,8 +2,7 @@ use super::{DeriveTypeDef, Fields, ImplGenerator, ImplMethods, Variant, Variants
 use crate::utils::Metas;
 use proc_macro2::TokenStream;
 use std::convert::TryFrom;
-use syn::parse::Result;
-use syn::punctuated::Pair;
+use syn::{parse::Result, punctuated::Pair};
 
 #[derive(Debug, Clone)]
 pub struct DeriveEnum {
@@ -16,12 +15,7 @@ impl DeriveEnum {
             Ok(self.gen_complete_methods(ty, gen))
         } else if self.variants.is_unit() {
             self.gen_unit_methods(ty, gen)
-        } else if let Some(index) = ty
-            .metas
-            .find_meta_nested("dbus")
-            .find_meta_nested("index")
-            .option()
-        {
+        } else if let Some(index) = ty.metas.find_meta_nested("dbus").find_meta_nested("index").option() {
             self.gen_index_methods(ty, gen, index)
         } else {
             Err(syn::Error::new(
@@ -34,14 +28,8 @@ impl DeriveEnum {
     fn gen_complete_methods(&self, ty: &DeriveTypeDef, gen: &ImplGenerator) -> ImplMethods {
         vec![
             ("code", gen.gen_code_method(quote::quote!(b'v'), None)),
-            (
-                "signature",
-                gen.gen_signature_method(quote::quote!("v".into()), None),
-            ),
-            (
-                "alignment",
-                gen.gen_alignment_method(quote::quote!(1), None),
-            ),
+            ("signature", gen.gen_signature_method(quote::quote!("v".into()), None)),
+            ("alignment", gen.gen_alignment_method(quote::quote!(1), None)),
             ("encode", self.gen_encode_method(ty, gen)),
             ("decode", self.gen_decode_method(ty, gen)),
         ]
@@ -62,33 +50,47 @@ impl DeriveEnum {
         let values = self.variants.values();
 
         Ok(vec![
-           ("code", gen.gen_code_method(quote::quote!(#repr::code()), None)),
-           ("signature", gen.gen_signature_method(quote::quote!(#repr::signature()), None)),
-           ("alignment", gen.gen_alignment_method(quote::quote!(#repr::alignment()), None)),
-           ("encode",
-            gen.gen_encode_method(syn::parse_quote!(marshaller), quote::quote!((*self as #repr).encode(marshaller)), None)),
-           ("decode",
-            gen.gen_decode_method(syn::parse_quote!(marshaller), quote::quote! {
-                let value = #repr::decode(marshaller)?;
-                match value {
-                    #(#values => Ok(#ty_names::#variant_names),)*
-                    value => Err(#rbus_module::Error::InvalidVariant { value: value as u64 }),
-                }
-           }, None)),
+            ("code", gen.gen_code_method(quote::quote!(#repr::code()), None)),
+            (
+                "signature",
+                gen.gen_signature_method(quote::quote!(#repr::signature()), None),
+            ),
+            (
+                "alignment",
+                gen.gen_alignment_method(quote::quote!(#repr::alignment()), None),
+            ),
+            (
+                "encode",
+                gen.gen_encode_method(
+                    syn::parse_quote!(marshaller),
+                    quote::quote!((*self as #repr).encode(marshaller)),
+                    None,
+                ),
+            ),
+            (
+                "decode",
+                gen.gen_decode_method(
+                    syn::parse_quote!(marshaller),
+                    quote::quote! {
+                         let value = #repr::decode(marshaller)?;
+                         match value {
+                             #(#values => Ok(#ty_names::#variant_names),)*
+                             value => Err(#rbus_module::Error::InvalidVariant { value: value as u64 }),
+                         }
+                    },
+                    None,
+                ),
+            ),
         ])
     }
 
-    fn gen_index_methods(
-        &self,
-        ty: &DeriveTypeDef,
-        gen: &ImplGenerator,
-        index: Metas,
-    ) -> Result<ImplMethods> {
+    fn gen_index_methods(&self, ty: &DeriveTypeDef, gen: &ImplGenerator, index: Metas) -> Result<ImplMethods> {
         let rbus_module = gen.rbus_module();
-        let index_ty =
-            index.words().next().cloned().ok_or_else(|| {
-                syn::Error::new(ty.span, "Unit-only enums must have a fixed repr")
-            })?;
+        let index_ty = index
+            .words()
+            .next()
+            .cloned()
+            .ok_or_else(|| syn::Error::new(ty.span, "Unit-only enums must have a fixed repr"))?;
         let indexes = self.variants.indexes()?;
         let variant_encodes: TokenStream = self
             .variants
@@ -123,15 +125,9 @@ impl DeriveEnum {
             ("code", gen.gen_code_method(quote::quote!(b'r'), None)),
             (
                 "signature",
-                gen.gen_signature_method(
-                    quote::quote!(format!("({}v)", <#index_ty>::signature())),
-                    None,
-                ),
+                gen.gen_signature_method(quote::quote!(format!("({}v)", <#index_ty>::signature())), None),
             ),
-            (
-                "alignment",
-                gen.gen_alignment_method(quote::quote!(8), None),
-            ),
+            ("alignment", gen.gen_alignment_method(quote::quote!(8), None)),
             (
                 "encode",
                 gen.gen_encode_method(
@@ -187,12 +183,7 @@ impl DeriveEnum {
         gen.gen_encode_method(syn::parse_quote!(marshaller), body, None)
     }
 
-    fn gen_encode_variant(
-        &self,
-        ty: &DeriveTypeDef,
-        variant: &Variant,
-        body: TokenStream,
-    ) -> TokenStream {
+    fn gen_encode_variant(&self, ty: &DeriveTypeDef, variant: &Variant, body: TokenStream) -> TokenStream {
         let ty_name = &ty.name;
         let variant_name = &variant.name;
         let pat = variant.fields.pat(true);
@@ -298,11 +289,7 @@ impl TryFrom<syn::DataEnum> for DeriveEnum {
     type Error = syn::Error;
 
     fn try_from(data: syn::DataEnum) -> Result<Self> {
-        let variants = data
-            .variants
-            .into_pairs()
-            .map(Pair::into_value)
-            .collect::<Vec<_>>();
+        let variants = data.variants.into_pairs().map(Pair::into_value).collect::<Vec<_>>();
         let variants = Variants::try_from(variants)?;
 
         Ok(DeriveEnum { variants })

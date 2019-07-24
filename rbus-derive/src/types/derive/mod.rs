@@ -44,12 +44,7 @@ impl TryFrom<syn::Data> for DeriveData {
         let data = match data {
             syn::Data::Enum(data) => DeriveData::Enum(data.try_into()?),
             syn::Data::Struct(data) => DeriveData::Struct(data.try_into()?),
-            _ => {
-                return Err(syn::Error::new(
-                    Span::call_site(),
-                    "Data not supported for derive",
-                ))
-            }
+            _ => return Err(syn::Error::new(Span::call_site(), "Data not supported for derive")),
         };
 
         Ok(data)
@@ -69,12 +64,7 @@ impl DeriveTypeDef {
     fn impl_type(self) -> Result<TokenStream> {
         let generics = self.gen_generics()?;
 
-        let mut gen = ImplGenerator::new_ident(
-            self.span,
-            self.metas.clone(),
-            Some(generics),
-            self.name.clone(),
-        );
+        let mut gen = ImplGenerator::new_ident(self.span, self.metas.clone(), Some(generics), self.name.clone());
 
         let methods = self.data.gen_methods(&self, &gen)?;
         for (name, method) in methods.into_iter() {

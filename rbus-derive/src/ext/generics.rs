@@ -1,5 +1,4 @@
-use syn::punctuated::Punctuated;
-use syn::Generics;
+use syn::{punctuated::Punctuated, Generics};
 
 pub trait GenericsExt {
     fn empty() -> Generics {

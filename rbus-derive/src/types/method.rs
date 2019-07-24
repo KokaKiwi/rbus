@@ -2,10 +2,12 @@ use super::ImplGenerator;
 use crate::utils::Metas;
 use proc_macro2::TokenStream;
 use quote::ToTokens;
-use syn::parse::{Parse, ParseStream, Result};
-use syn::punctuated::Punctuated;
-use syn::spanned::Spanned;
-use syn::Error;
+use syn::{
+    parse::{Parse, ParseStream, Result},
+    punctuated::Punctuated,
+    spanned::Spanned,
+    Error,
+};
 
 pub type Methods = Vec<Method>;
 
@@ -64,9 +66,7 @@ impl Method {
     }
 
     fn gen_encode_method(&self, gen: &ImplGenerator) -> Result<TokenStream> {
-        let Method {
-            metas, args, body, ..
-        } = self;
+        let Method { metas, args, body, .. } = self;
         let marshaller = args
             .first()
             .map(|pair| pair.into_value())
@@ -77,9 +77,7 @@ impl Method {
     }
 
     fn gen_decode_method(&self, gen: &ImplGenerator) -> Result<TokenStream> {
-        let Method {
-            metas, args, body, ..
-        } = self;
+        let Method { metas, args, body, .. } = self;
         let marshaller = args
             .first()
             .map(|pair| pair.into_value())
