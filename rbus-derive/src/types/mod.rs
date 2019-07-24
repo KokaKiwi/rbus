@@ -105,8 +105,7 @@ impl Parse for TypeDef {
 
         let mut generics = if input.peek(syn::Token![impl]) {
             input.parse::<syn::Token![impl]>()?;
-            let generics = input.parse()?;
-            generics
+            input.parse()?
         } else {
             syn::Generics::empty()
         };

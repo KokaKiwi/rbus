@@ -12,7 +12,7 @@ impl DeriveStruct {
     pub fn gen_methods(&self, gen: &ImplGenerator) -> Result<ImplMethods> {
         let field_types = self.field_types();
         let signature_format_str = if gen.is_packed() {
-            format!("{}", "{}".repeat(field_types.len()))
+            "{}".repeat(self.fields.len())
         } else {
             format!("({})", "{}".repeat(field_types.len()))
         };

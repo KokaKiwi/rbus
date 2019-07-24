@@ -13,6 +13,7 @@ pub struct Message<T: DBusType> {
 }
 
 impl<T: DBusType> Message<T> {
+    #[allow(clippy::new_ret_no_self)]
     pub fn new(data: T) -> MessageBuilder<T> {
         MessageBuilder::new(data)
     }

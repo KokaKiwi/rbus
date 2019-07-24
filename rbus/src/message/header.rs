@@ -29,6 +29,7 @@ impl_type! {
     }
 }
 
+#[allow(clippy::trivially_copy_pass_by_ref)]
 fn mutate_marshaller<T>(endianness: &Endianness, marshaller: &mut Marshaller<T>) {
     marshaller.endianness = *endianness;
 }

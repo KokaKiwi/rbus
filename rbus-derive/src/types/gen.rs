@@ -73,7 +73,7 @@ impl ImplGenerator {
         let accept_names = DBUS_TYPE_METHOD_NAMES;
 
         if accept_names.contains(&name.as_str()) {
-            self.methods.insert(name.into(), method);
+            self.methods.insert(name, method);
         }
     }
 
@@ -84,7 +84,11 @@ impl ImplGenerator {
 
         let methods = DBUS_TYPE_METHOD_NAMES
             .iter()
-            .map(|&name| self.methods.get(name).ok_or_else(|| Error::new(self.span, format!(""))))
+            .map(|&name| {
+                self.methods
+                    .get(name)
+                    .ok_or_else(|| Error::new(self.span, format!("Missing method: {}", name)))
+            })
             .collect::<Result<Vec<_>>>()?;
 
         let mut tokens = quote::quote! {
