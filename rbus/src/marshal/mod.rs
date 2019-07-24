@@ -57,7 +57,6 @@ where
     }
 
     pub fn write_value<U: DBusType>(&mut self, value: &U) -> Result<()> {
-        self.write_padding(U::alignment())?;
         value.encode(self)
     }
 }
@@ -73,7 +72,6 @@ where
     }
 
     pub fn read_value<U: DBusType>(&mut self) -> Result<U> {
-        self.read_padding(U::alignment())?;
         U::decode(self)
     }
 }

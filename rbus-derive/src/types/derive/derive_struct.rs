@@ -61,7 +61,12 @@ impl DeriveStruct {
                 let dbus = field.dbus();
                 let mut tokens = TokenStream::new();
 
-                if !gen.is_packed() {
+                if gen.is_packed() {
+                    let ty = field.ty;
+                    tokens.extend(quote::quote! {
+                        marshaller.write_padding(<#ty>::alignment())?;
+                    });
+                } else {
                     tokens.extend(quote::quote! {
                         marshaller.write_padding(Self::alignment())?;
                     });
