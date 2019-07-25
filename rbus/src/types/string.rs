@@ -56,7 +56,7 @@ pub struct ObjectPath(String);
 impl ObjectPath {
     pub fn new<T: AsRef<str>>(path: T) -> Result<Self, ObjectPathError> {
         lazy_static! {
-            static ref OBJECT_PATH_SEGMENT_REGEX: Regex = Regex::new(r"([A-Z][a-z][0-9]_)+").unwrap();
+            static ref OBJECT_PATH_SEGMENT_REGEX: Regex = Regex::new(r"^([[:alnum:]]|_)+$").unwrap();
         }
 
         let path = path.as_ref();
@@ -77,17 +77,20 @@ impl ObjectPath {
             });
         }
 
-        for (index, segment) in path.split('/').enumerate() {
-            if index != 0 && segment == "" {
-                return Err(ObjectPathError::InvalidObjectPath {
-                    message: "No element may be the empty string".into(),
-                });
-            }
+        if path.len() > 1 {
+            for segment in path.split('/').skip(1) {
+                if segment.is_empty() {
+                    return Err(ObjectPathError::InvalidObjectPath {
+                        message: "No element may be the empty string".into(),
+                    });
+                }
 
-            if !OBJECT_PATH_SEGMENT_REGEX.is_match(segment) {
-                return Err(ObjectPathError::InvalidObjectPath {
-                    message: "Each element must only contain the ASCII characters \"[A-Z][a-z][0-9]_\"".into(),
-                });
+                dbg!(segment);
+                if !OBJECT_PATH_SEGMENT_REGEX.is_match(segment) {
+                    return Err(ObjectPathError::InvalidObjectPath {
+                        message: "Each element must only contain the ASCII characters \"[A-Z][a-z][0-9]_\"".into(),
+                    });
+                }
             }
         }
 
@@ -164,6 +167,37 @@ impl_type! {
             marshaller.io().read_u8()?;
             let value = String::from_utf8(data)?;
             Ok(Signature(value))
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const VALID_OBJECT_PATHS: &[&str] = &[
+        "/",
+        "/a",
+        "/_",
+        "/a/b/c",
+        "/com/example/123",
+        "/org/freedesktop/DBus",
+        "/org/freedesktop/Telepathy/AccountManager",
+    ];
+
+    const INVALID_OBJECT_PATHS: &[&str] = &["", ".", "//", "/a/", "/-", "/com//example/MyApp", "/$"];
+
+    #[test]
+    fn test_valid_object_paths() {
+        for path in VALID_OBJECT_PATHS {
+            assert_ok!(ObjectPath::new(path), path);
+        }
+    }
+
+    #[test]
+    fn test_invalid_object_paths() {
+        for path in INVALID_OBJECT_PATHS {
+            assert_err!(ObjectPath::new(path), path);
         }
     }
 }
