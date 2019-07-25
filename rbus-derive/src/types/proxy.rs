@@ -8,14 +8,20 @@ pub fn gen_proxy_methods(gen: &ImplGenerator, span: Span, proxy: Metas) -> Resul
         .words()
         .next()
         .ok_or_else(|| syn::Error::new(span, "You must define a proxy type"))?;
-    let getter: TokenStream = proxy
-        .find_meta_value_parse::<syn::Ident>("get")?
-        .map(|getter| quote::quote!(self.#getter()))
-        .unwrap_or_else(|| quote::quote!(self));
-    let setter: TokenStream = proxy
-        .find_meta_value_parse::<syn::Ident>("set")?
-        .map(|setter| quote::quote!(Self::#setter(value)))
-        .unwrap_or_else(|| quote::quote!(value));
+    let getter = if let Some(getter) = proxy.find_meta_value_parse::<syn::Ident>("get")? {
+        quote::quote!(self.#getter())
+    } else if proxy.has_word("inner") {
+        quote::quote!(self.0)
+    } else {
+        quote::quote!(self)
+    };
+    let setter = if let Some(setter) = proxy.find_meta_value_parse::<syn::Ident>("set")? {
+        quote::quote!(Self::#setter(value))
+    } else if proxy.has_word("inner") {
+        quote::quote!(Self(value))
+    } else {
+        quote::quote!(value)
+    };
 
     Ok(vec![
         ("code", gen.gen_code_method(quote::quote!(<#proxy_ty>::code()), None)),

@@ -109,17 +109,8 @@ impl AsRef<str> for ObjectPath {
 }
 
 impl_type! {
-    #[dbus(basic, align = 4, module = "crate")]
-    ObjectPath: 'o' {
-        encode(marshaller) {
-            self.0.encode(marshaller)
-        }
-
-        decode(marshaller) {
-            let value = String::decode(marshaller)?;
-            Ok(ObjectPath(value))
-        }
-    }
+    #[dbus(basic, align = 4, module = "crate", proxy(String, inner))]
+    ObjectPath: 'o'
 }
 
 // Signature
