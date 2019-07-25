@@ -1,4 +1,36 @@
 #[macro_export(crate)]
+macro_rules! assert_some {
+    ($expr:expr) => {
+        match $expr {
+            Some(_) => {}
+            None => panic!("Expected Some but got None"),
+        }
+    };
+    ($expr:expr, $msg:expr) => {
+        match $expr {
+            Some(_) => {}
+            None => panic!("Expected Some but got None"),
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! assert_none {
+    ($expr:expr) => {
+        match $expr {
+            Some(value) => panic!("Expected None but got Some({:?})", value),
+            None => {}
+        }
+    };
+    ($expr:expr, $msg:expr) => {
+        match $expr {
+            Some(value) => panic!("Expected None but got Some({:?}): {:?}", value, $msg),
+            None => {}
+        }
+    };
+}
+
+#[macro_export(crate)]
 macro_rules! assert_ok {
     ($expr:expr) => {
         match $expr {

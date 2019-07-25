@@ -125,7 +125,8 @@ impl_type! {
 // Signature
 custom_error! {
     pub SignatureError
-        InvalidSignature = "Invalid signature"
+        InvalidSignature { message: String }
+            = "Invalid signature"
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -133,8 +134,28 @@ pub struct Signature(String);
 
 impl Signature {
     pub fn new<T: AsRef<str>>(sig: T) -> Result<Self, SignatureError> {
+        // TODO: Validate signature (rules 2 and 3), maybe need a parser...
+        lazy_static! {
+            static ref SIGNATURE_ALLOWED_CHARS: Regex = Regex::new(r"^[ybnqiuxtdhsogav(){}]*$").unwrap();
+        }
+
         let sig = sig.as_ref();
-        // TODO: Validate signature
+
+        if sig.len() > 255 {
+            return Err(SignatureError::InvalidSignature {
+                message: "The maximum length of a signature is 255".into(),
+            });
+        }
+
+        if !SIGNATURE_ALLOWED_CHARS.is_match(sig) {
+            return Err(SignatureError::InvalidSignature {
+                message: "Only type codes, open and close parentheses, and open and close curly brackets are allowed \
+                          in the signature. The STRUCT type code is not allowed in signatures, because parentheses \
+                          are used instead. Similarly, the DICT_ENTRY type code is not allowed in signatures, because \
+                          curly brackets are used instead."
+                    .into(),
+            });
+        }
 
         Ok(Signature(sig.into()))
     }
@@ -187,6 +208,14 @@ mod tests {
 
     const INVALID_OBJECT_PATHS: &[&str] = &["", ".", "//", "/a/", "/-", "/com//example/MyApp", "/$"];
 
+    const VALID_SIGNATURES: &[&str] = &["", "s", "a{sv}", "sss", "sv", "a{sv}as"];
+
+    const INVALID_SIGNATURES: &[&str] = &[
+        // TODO: Validate signature (rules 2 and 3), maybe need a parser...
+        // "a",
+        "a{s_}",
+    ];
+
     #[test]
     fn test_valid_object_paths() {
         for path in VALID_OBJECT_PATHS {
@@ -198,6 +227,20 @@ mod tests {
     fn test_invalid_object_paths() {
         for path in INVALID_OBJECT_PATHS {
             assert_err!(ObjectPath::new(path), path);
+        }
+    }
+
+    #[test]
+    fn test_valid_signatures() {
+        for sig in VALID_SIGNATURES {
+            assert_ok!(Signature::new(sig), sig);
+        }
+    }
+
+    #[test]
+    fn test_invalid_signatures() {
+        for sig in INVALID_SIGNATURES {
+            assert_err!(Signature::new(sig), sig);
         }
     }
 }
