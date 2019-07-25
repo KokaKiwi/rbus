@@ -1,5 +1,7 @@
 use custom_error::custom_error;
+use lazy_static::lazy_static;
 use rbus_derive::impl_type;
+use regex::Regex;
 
 // Basic strings
 // TODO: Validate strings? (according to DBus specs)
@@ -44,7 +46,8 @@ impl_type! {
 // Object path
 custom_error! {
     pub ObjectPathError
-        InvalidObjectPath = "Invalid object path"
+        InvalidObjectPath { message: String }
+            = "Invalid object path: {message}"
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -52,8 +55,41 @@ pub struct ObjectPath(String);
 
 impl ObjectPath {
     pub fn new<T: AsRef<str>>(path: T) -> Result<Self, ObjectPathError> {
-        // TODO: Validate path
+        lazy_static! {
+            static ref OBJECT_PATH_SEGMENT_REGEX: Regex = Regex::new(r"([A-Z][a-z][0-9]_)+").unwrap();
+        }
+
         let path = path.as_ref();
+
+        if !path.contains('/') || !path.starts_with('/') {
+            return Err(ObjectPathError::InvalidObjectPath {
+                message: "The path must begin with an ASCII '/' (integer 47) character, and must consist of elements \
+                          separated by slash characters"
+                    .into(),
+            });
+        }
+
+        if path.len() > 1 && path.ends_with('/') {
+            return Err(ObjectPathError::InvalidObjectPath {
+                message: "A trailing '/' character is not allowed unless the path is the root path (a single '/' \
+                          character)"
+                    .into(),
+            });
+        }
+
+        for (index, segment) in path.split('/').enumerate() {
+            if index != 0 && segment == "" {
+                return Err(ObjectPathError::InvalidObjectPath {
+                    message: "No element may be the empty string".into(),
+                });
+            }
+
+            if !OBJECT_PATH_SEGMENT_REGEX.is_match(segment) {
+                return Err(ObjectPathError::InvalidObjectPath {
+                    message: "Each element must only contain the ASCII characters \"[A-Z][a-z][0-9]_\"".into(),
+                });
+            }
+        }
 
         Ok(ObjectPath(path.into()))
     }
@@ -94,8 +130,8 @@ pub struct Signature(String);
 
 impl Signature {
     pub fn new<T: AsRef<str>>(sig: T) -> Result<Self, SignatureError> {
-        // TODO: Validate signature
         let sig = sig.as_ref();
+        // TODO: Validate signature
 
         Ok(Signature(sig.into()))
     }
