@@ -71,6 +71,7 @@ impl DeriveTypeDef {
             gen.add_method(name, method);
         }
 
+        gen.override_methods_from_metas()?;
         gen.gen_impl()
     }
 

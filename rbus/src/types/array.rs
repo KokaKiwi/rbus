@@ -1,5 +1,5 @@
-use super::DBusType;
-use rbus_derive::impl_type;
+use super::{impl_type, DBusType};
+use std::io::prelude::*;
 
 impl_type! {
     #[dbus(align = 4, module = "crate")]

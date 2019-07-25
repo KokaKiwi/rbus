@@ -3,7 +3,7 @@ use super::{impl_type, DBusType};
 macro_rules! impl_tuple_dbus_type {
     ($($index:tt: $ty:ident),*) => {
         impl_type! {
-            #[dbus(packed, align = 1)]
+            #[dbus(align = 1)]
             impl<$($ty: DBusType),*> ($($ty,)*) {
                 signature() {
                     let signatures: &[String] = &[$(<$ty>::signature()),*];

@@ -30,18 +30,18 @@ impl TypeDef {
         let dbus = self.metas.find_meta_nested("dbus");
         let proxy = dbus.find_meta_nested("proxy");
 
-        let code_method = self.gen_code_method()?;
-        let signature_method = self.gen_signature_method()?;
-        let alignment_method = self.gen_alignment_method()?;
+        let code_body = self.gen_code_body()?;
+        let signature_body = self.gen_signature_body()?;
+        let alignment_body = self.gen_alignment_body()?;
 
         let methods = self.methods;
 
         let mut gen = ImplGenerator::new(Span::call_site(), self.metas, Some(self.generics), self.ty);
         gen.options.default_rbus_module = "crate".into();
 
-        gen.add_method("code", code_method);
-        gen.add_method("signature", signature_method);
-        gen.add_method("alignment", alignment_method);
+        gen.add_method("code", gen.gen_code_method(code_body, None));
+        gen.add_method("signature", gen.gen_signature_method(signature_body, None));
+        gen.add_method("alignment", gen.gen_alignment_method(alignment_body, None));
 
         if !proxy.is_empty() {
             let methods = gen_proxy_methods(&gen, Span::call_site(), proxy)?;
@@ -55,6 +55,7 @@ impl TypeDef {
             gen.add_method(name, method);
         }
 
+        gen.override_methods_from_metas()?;
         gen.gen_impl()
     }
 
@@ -62,15 +63,13 @@ impl TypeDef {
         self.code.as_ref().map(|code| code.value()).unwrap_or('\0')
     }
 
-    fn gen_code_method(&self) -> Result<TokenStream> {
+    fn gen_code_body(&self) -> Result<TokenStream> {
         let code = self.code();
 
-        Ok(quote::quote! {
-            fn code() -> u8 { #code as u8 }
-        })
+        Ok(quote::quote!(#code as u8))
     }
 
-    fn gen_signature_method(&self) -> Result<TokenStream> {
+    fn gen_signature_body(&self) -> Result<TokenStream> {
         let signature = self
             .metas
             .find_meta_nested("dbus")
@@ -78,12 +77,10 @@ impl TypeDef {
             .map(|value| value.value())
             .unwrap_or_else(|| format!("{}", self.code()));
 
-        Ok(quote::quote! {
-            fn signature() -> String { #signature.into() }
-        })
+        Ok(quote::quote!(#signature.into()))
     }
 
-    fn gen_alignment_method(&self) -> Result<TokenStream> {
+    fn gen_alignment_body(&self) -> Result<TokenStream> {
         let alignment = match self.metas.find_meta_nested("dbus").find_meta_value("align")? {
             Some(syn::Lit::Int(lit)) => quote::quote!(#lit as u8),
             Some(syn::Lit::Str(lit)) if lit.value() == "size" => quote::quote!(std::mem::size_of::<Self>() as u8),
@@ -91,9 +88,7 @@ impl TypeDef {
             None => quote::quote!(1),
         };
 
-        Ok(quote::quote! {
-            fn alignment() -> u8 { #alignment }
-        })
+        Ok(quote::quote!(#alignment))
     }
 }
 

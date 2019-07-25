@@ -5,7 +5,7 @@ use crate::{
 use proc_macro2::{Span, TokenStream};
 use quote::ToTokens;
 use std::collections::HashMap;
-use syn::{Error, Result};
+use syn::{spanned::Spanned, Error, Result};
 
 const DBUS_TYPE_METHOD_NAMES: &[&str] = &["code", "signature", "alignment", "encode", "decode"];
 
@@ -77,6 +77,37 @@ impl ImplGenerator {
         }
     }
 
+    pub fn override_methods_from_metas(&mut self) -> Result<()> {
+        if let Some(meta) = self.dbus.find_meta_value("code")? {
+            let body = match meta {
+                syn::Lit::Byte(lit) => quote::quote!(#lit as u8),
+                syn::Lit::Int(lit) => quote::quote!(#lit as u8),
+                syn::Lit::Char(lit) => quote::quote!(#lit as u8),
+                lit => return Err(Error::new(lit.span(), "Bad code value, expected byte or integer")),
+            };
+
+            self.add_method("code", self.gen_code_method(body, None));
+        }
+
+        if let Some(signature) = self.dbus.find_meta_value_str("signature")? {
+            let body = quote::quote!(#signature.into());
+
+            self.add_method("signature", self.gen_signature_method(body, None));
+        }
+
+        if let Some(align) = self.dbus.find_meta_value("align")? {
+            let body = match align {
+                syn::Lit::Int(lit) => quote::quote!(#lit as u8),
+                syn::Lit::Str(lit) if lit.value() == "size" => quote::quote!(std::mem::size_of::<Self>() as u8),
+                lit => return Err(Error::new(lit.span(), "Bad align value, only integer or \"size\"")),
+            };
+
+            self.add_method("alignment", self.gen_alignment_method(body, None));
+        }
+
+        Ok(())
+    }
+
     pub fn gen_impl(self) -> Result<TokenStream> {
         let rbus_module = self.rbus_module();
         let (impl_generics, _, where_clause) = self.generics.split_for_impl();
@@ -142,8 +173,6 @@ impl ImplGenerator {
             where
                 Inner: std::io::Write
             {
-                use std::io::Write;
-
                 #body
             }
         }
@@ -164,8 +193,6 @@ impl ImplGenerator {
             where
                 Inner: std::io::Read
             {
-                use std::io::Read;
-
                 #body
             }
         }

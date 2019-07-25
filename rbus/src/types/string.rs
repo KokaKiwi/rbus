@@ -1,7 +1,8 @@
+use super::{impl_type, DBusType};
 use custom_error::custom_error;
 use lazy_static::lazy_static;
-use rbus_derive::impl_type;
 use regex::Regex;
+use std::io::prelude::*;
 
 // Basic strings
 // TODO: Validate strings? (according to DBus specs)
@@ -50,7 +51,15 @@ custom_error! {
             = "Invalid object path: {message}"
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, DBusType)]
+#[dbus(
+    basic,
+    code = 'o',
+    signature = "o",
+    align = 4,
+    module = "crate",
+    proxy(String, inner)
+)]
 pub struct ObjectPath(String);
 
 impl ObjectPath {
@@ -106,11 +115,6 @@ impl AsRef<str> for ObjectPath {
     fn as_ref(&self) -> &str {
         self.as_str()
     }
-}
-
-impl_type! {
-    #[dbus(basic, align = 4, module = "crate", proxy(String, inner))]
-    ObjectPath: 'o'
 }
 
 // Signature
