@@ -11,5 +11,6 @@ proc-macro = true
 [dependencies]
 backtrace = "*"
 proc-macro2 = "*"
+proc-macro-utils = { version = "*", git = "https://gitlab.kokakiwi.net/rusted/proc-macro-utils.git" }
 quote = "*"
-syn = { version = "*", features = ["full"] }
+syn = { version = "*", features = ["full", "extra-traits"] }
