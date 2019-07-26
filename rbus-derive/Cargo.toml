@@ -3,6 +3,7 @@ name = "rbus-derive"
 version = "0.1.0"
 authors = ["KokaKiwi <kokakiwi+git@kokakiwi.net>"]
 edition = "2018"
+license = "BSD-3-Clause"
 
 [lib]
 proc-macro = true
