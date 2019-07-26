@@ -1,3 +1,4 @@
+use super::types::*;
 use crate::{
     marshal::Marshaller,
     types::{impl_type, DBusType, ObjectPath, Signature},
@@ -62,9 +63,9 @@ pub enum HeaderField {
     #[doc(hidden)]
     Invalid,
     Path(ObjectPath),
-    Interface(String),
-    Member(String),
-    ErrorName(String),
+    Interface(Interface),
+    Member(Member),
+    ErrorName(ErrorName),
     ReplySerial(u32),
     Destination(String),
     Sender(String),

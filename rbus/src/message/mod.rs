@@ -4,6 +4,7 @@ pub use header::*;
 
 mod builder;
 mod header;
+pub mod types;
 
 #[derive(Debug, Clone, DBusType)]
 #[dbus(module = "crate")]
