@@ -1,5 +1,6 @@
 use super::{impl_type, DBusType};
 use custom_error::custom_error;
+use derive_more::*;
 use lazy_static::lazy_static;
 use regex::Regex;
 use std::io::prelude::*;
@@ -51,7 +52,7 @@ custom_error! {
             = "Invalid object path: {message}"
 }
 
-#[derive(Debug, Clone, PartialEq, DBusType)]
+#[derive(Debug, Clone, PartialEq, Deref, DBusType)]
 #[dbus(
     basic,
     code = 'o',
@@ -94,7 +95,6 @@ impl ObjectPath {
                     });
                 }
 
-                dbg!(segment);
                 if !OBJECT_PATH_SEGMENT_REGEX.is_match(segment) {
                     return Err(ObjectPathError::InvalidObjectPath {
                         message: "Each element must only contain the ASCII characters \"[A-Z][a-z][0-9]_\"".into(),
@@ -105,15 +105,11 @@ impl ObjectPath {
 
         Ok(ObjectPath(path.into()))
     }
-
-    pub fn as_str(&self) -> &str {
-        self.0.as_str()
-    }
 }
 
 impl AsRef<str> for ObjectPath {
     fn as_ref(&self) -> &str {
-        self.as_str()
+        &self.0
     }
 }
 
@@ -124,7 +120,7 @@ custom_error! {
             = "Invalid signature"
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Deref)]
 pub struct Signature(String);
 
 impl Signature {
@@ -170,8 +166,8 @@ impl_type! {
     #[dbus(basic, module = "crate")]
     Signature: 'g' {
         encode(marshaller) {
-            marshaller.io().write_u8(self.0.len() as u8)?;
-            marshaller.io().write_all(self.0.as_bytes())?;
+            marshaller.io().write_u8(self.len() as u8)?;
+            marshaller.io().write_all(self.as_bytes())?;
             marshaller.io().write_u8(0)?;
             Ok(())
         }

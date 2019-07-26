@@ -12,6 +12,7 @@ crate-type = ["lib", "staticlib", "cdylib"]
 bitflags = "*"
 byteordered = "*"
 custom_error = "*"
+derive_more = "*"
 lazy_static = "*"
 rand = "*"
 rbus-derive = { version = "*", path = "../rbus-derive" }
