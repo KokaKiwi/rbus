@@ -98,7 +98,7 @@ impl Parse for DeriveTypeDef {
 
         Ok(DeriveTypeDef {
             span: derive_input.span(),
-            metas: Metas::from_attributes(derive_input.attrs)?,
+            metas: Metas::from_attributes(&derive_input.attrs)?,
             name: derive_input.ident,
             generics: derive_input.generics,
             data: DeriveData::try_from(derive_input.data)?,

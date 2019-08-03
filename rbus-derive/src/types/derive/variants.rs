@@ -100,7 +100,7 @@ impl TryFrom<syn::Variant> for Variant {
     fn try_from(variant: syn::Variant) -> Result<Self> {
         Ok(Variant {
             span: variant.span(),
-            metas: Metas::from_attributes(variant.attrs)?,
+            metas: Metas::from_attributes(&variant.attrs)?,
             name: variant.ident,
             fields: Fields::try_from(variant.fields)?,
             value: variant.discriminant.map(|(_, value)| value),
