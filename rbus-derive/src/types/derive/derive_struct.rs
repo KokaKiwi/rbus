@@ -32,17 +32,17 @@ impl DeriveStruct {
         let decode_method = self.gen_decode_method(gen)?;
 
         Ok(vec![
-            ("code", gen.gen_code_method(code, None)),
+            ("code", gen.gen_code_method(code, &[])),
             (
                 "signature",
                 gen.gen_signature_method(
                     quote::quote! {
                         format!(#signature_format_str, #(<#field_types>::signature()),*)
                     },
-                    None,
+                    &[],
                 ),
             ),
-            ("alignment", gen.gen_alignment_method(alignment, None)),
+            ("alignment", gen.gen_alignment_method(alignment, &[])),
             ("encode", encode_method),
             ("decode", decode_method),
         ])
@@ -77,7 +77,7 @@ impl DeriveStruct {
                     self.#name.encode(marshaller)?;
                 });
 
-                if let Some(value) = dbus.find_meta_value_str("mutate_marshaller")? {
+                if let Some(value) = dbus.find_meta_value_str("mutate_marshaller") {
                     let path: TokenStream = value.parse()?;
 
                     tokens.extend(quote::quote! {
@@ -92,7 +92,7 @@ impl DeriveStruct {
         let mut body = quote::quote!(#(#fields)*);
 
         let size = gen.dbus.find_meta_nested("size");
-        if let Some(value) = size.find_meta_value_int("align")? {
+        if let Some(value) = size.find_meta_value_int("align") {
             body.extend(quote::quote! {
                 marshaller.write_padding(#value)?;
             });
@@ -100,7 +100,7 @@ impl DeriveStruct {
 
         body.extend(quote::quote!(Ok(())));
 
-        Ok(gen.gen_encode_method(syn::parse_quote!(marshaller), body, None))
+        Ok(gen.gen_encode_method(syn::parse_quote!(marshaller), body, &[]))
     }
 
     fn gen_decode_method(&self, gen: &ImplGenerator) -> Result<TokenStream> {
@@ -129,7 +129,7 @@ impl DeriveStruct {
                     let #binding = <#ty>::decode(marshaller)?;
                 });
 
-                if let Some(value) = dbus.find_meta_value_str("mutate_marshaller")? {
+                if let Some(value) = dbus.find_meta_value_str("mutate_marshaller") {
                     let path: TokenStream = value.parse()?;
 
                     tokens.extend(quote::quote! {
@@ -145,7 +145,7 @@ impl DeriveStruct {
         let mut body = quote::quote!(#(#fields)*);
 
         let size = gen.dbus.find_meta_nested("size");
-        if let Some(value) = size.find_meta_value_int("align")? {
+        if let Some(value) = size.find_meta_value_int("align") {
             body.extend(quote::quote! {
                 marshaller.read_padding(#value)?;
             });
@@ -153,7 +153,7 @@ impl DeriveStruct {
 
         body.extend(quote::quote!(Ok(Self #bindings)));
 
-        Ok(gen.gen_decode_method(syn::parse_quote!(marshaller), body, None))
+        Ok(gen.gen_decode_method(syn::parse_quote!(marshaller), body, &[]))
     }
 }
 

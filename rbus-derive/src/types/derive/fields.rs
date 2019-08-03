@@ -1,4 +1,4 @@
-use crate::utils::{parse_metas, Metas};
+use crate::utils::*;
 use proc_macro2::{Span, TokenStream};
 use std::convert::TryFrom;
 use syn::{spanned::Spanned, Error, Result};
@@ -223,7 +223,7 @@ pub struct NamedField {
 impl NamedField {
     fn from(field: syn::Field) -> Result<NamedField> {
         Ok(NamedField {
-            metas: parse_metas(field.attrs.clone())?,
+            metas: Metas::from_attributes(&field.attrs)?,
             span: field.span(),
             name: field.ident.unwrap(),
             ty: field.ty,
@@ -247,7 +247,7 @@ impl UnnamedField {
     fn from((pos, field): (usize, syn::Field)) -> Result<UnnamedField> {
         let pos = syn::LitInt::new(pos as u64, syn::IntSuffix::None, field.span());
         Ok(UnnamedField {
-            metas: parse_metas(field.attrs.clone())?,
+            metas: Metas::from_attributes(&field.attrs)?,
             span: field.span(),
             pos,
             ty: field.ty,

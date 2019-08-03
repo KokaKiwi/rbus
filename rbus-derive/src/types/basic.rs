@@ -1,4 +1,5 @@
 use super::method::{parse_methods, Methods};
+use crate::utils::*;
 use proc_macro2::TokenStream;
 use syn::{
     parse::{Parse, ParseStream, Result},
@@ -6,7 +7,7 @@ use syn::{
 };
 
 pub struct BasicTypeDef {
-    attrs: Vec<syn::Attribute>,
+    attrs: Vec<Attribute>,
     ty: syn::Type,
     code: syn::LitChar,
     methods: Methods,
@@ -27,7 +28,7 @@ impl BasicTypeDef {
         let tokens = quote::quote! {
             rbus_derive::impl_type! {
                 #(#attrs)*
-                #[dbus(basic, module = "crate")]
+                #[dbus(basic, module = crate)]
                 #ty: #code {
                     #encode_method
                     #decode_method
@@ -74,7 +75,7 @@ impl BasicTypeDef {
 
 impl Parse for BasicTypeDef {
     fn parse(input: ParseStream) -> Result<Self> {
-        let attrs = input.call(syn::Attribute::parse_outer)?;
+        let attrs = input.call(Attribute::parse_many)?;
 
         let ty = input.parse()?;
         input.parse::<syn::Token![:]>()?;

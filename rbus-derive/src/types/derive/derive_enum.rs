@@ -1,5 +1,5 @@
 use super::{DeriveTypeDef, Fields, ImplGenerator, ImplMethods, Variant, Variants};
-use crate::utils::Metas;
+use crate::utils::*;
 use proc_macro2::TokenStream;
 use std::convert::TryFrom;
 use syn::{parse::Result, punctuated::Pair};
@@ -15,7 +15,12 @@ impl DeriveEnum {
             Ok(self.gen_complete_methods(ty, gen))
         } else if self.variants.is_unit() {
             self.gen_unit_methods(ty, gen)
-        } else if let Some(index) = ty.metas.find_meta_nested("dbus").find_meta_nested("index").option() {
+        } else if let Some(index) = ty
+            .metas
+            .find_meta_nested("dbus")
+            .find_meta_nested("index")
+            .into_option()
+        {
             self.gen_index_methods(ty, gen, index)
         } else {
             Err(syn::Error::new(
@@ -27,9 +32,9 @@ impl DeriveEnum {
 
     fn gen_complete_methods(&self, ty: &DeriveTypeDef, gen: &ImplGenerator) -> ImplMethods {
         vec![
-            ("code", gen.gen_code_method(quote::quote!(b'v'), None)),
-            ("signature", gen.gen_signature_method(quote::quote!("v".into()), None)),
-            ("alignment", gen.gen_alignment_method(quote::quote!(1), None)),
+            ("code", gen.gen_code_method(quote::quote!(b'v'), &[])),
+            ("signature", gen.gen_signature_method(quote::quote!("v".into()), &[])),
+            ("alignment", gen.gen_alignment_method(quote::quote!(1), &[])),
             ("encode", self.gen_encode_method(ty, gen)),
             ("decode", self.gen_decode_method(ty, gen)),
         ]
@@ -50,21 +55,21 @@ impl DeriveEnum {
         let values = self.variants.values();
 
         Ok(vec![
-            ("code", gen.gen_code_method(quote::quote!(#repr::code()), None)),
+            ("code", gen.gen_code_method(quote::quote!(#repr::code()), &[])),
             (
                 "signature",
-                gen.gen_signature_method(quote::quote!(#repr::signature()), None),
+                gen.gen_signature_method(quote::quote!(#repr::signature()), &[]),
             ),
             (
                 "alignment",
-                gen.gen_alignment_method(quote::quote!(#repr::alignment()), None),
+                gen.gen_alignment_method(quote::quote!(#repr::alignment()), &[]),
             ),
             (
                 "encode",
                 gen.gen_encode_method(
                     syn::parse_quote!(marshaller),
                     quote::quote!((*self as #repr).encode(marshaller)),
-                    None,
+                    &[],
                 ),
             ),
             (
@@ -78,7 +83,7 @@ impl DeriveEnum {
                              value => Err(#rbus_module::Error::InvalidVariant { value: value as u64 }),
                          }
                     },
-                    None,
+                    &[],
                 ),
             ),
         ])
@@ -122,12 +127,12 @@ impl DeriveEnum {
             .collect();
 
         Ok(vec![
-            ("code", gen.gen_code_method(quote::quote!(b'r'), None)),
+            ("code", gen.gen_code_method(quote::quote!(b'r'), &[])),
             (
                 "signature",
-                gen.gen_signature_method(quote::quote!(format!("({}v)", <#index_ty>::signature())), None),
+                gen.gen_signature_method(quote::quote!(format!("({}v)", <#index_ty>::signature())), &[]),
             ),
-            ("alignment", gen.gen_alignment_method(quote::quote!(8), None)),
+            ("alignment", gen.gen_alignment_method(quote::quote!(8), &[])),
             (
                 "encode",
                 gen.gen_encode_method(
@@ -139,7 +144,7 @@ impl DeriveEnum {
                             #variant_encodes
                         }
                     },
-                    None,
+                    &[],
                 ),
             ),
             (
@@ -159,7 +164,7 @@ impl DeriveEnum {
                             message: "Bad variant value".into(),
                         })
                     },
-                    None,
+                    &[],
                 ),
             ),
         ])
@@ -180,7 +185,7 @@ impl DeriveEnum {
             }
         };
 
-        gen.gen_encode_method(syn::parse_quote!(marshaller), body, None)
+        gen.gen_encode_method(syn::parse_quote!(marshaller), body, &[])
     }
 
     fn gen_encode_variant(&self, ty: &DeriveTypeDef, variant: &Variant, body: TokenStream) -> TokenStream {
@@ -235,7 +240,7 @@ impl DeriveEnum {
             })
         };
 
-        gen.gen_decode_method(syn::parse_quote!(marshaller), body, None)
+        gen.gen_decode_method(syn::parse_quote!(marshaller), body, &[])
     }
 
     fn gen_decode_variant(&self, variant: &Variant, body: TokenStream) -> TokenStream {

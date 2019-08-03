@@ -1,5 +1,5 @@
 use super::{gen_proxy_methods, ImplGenerator};
-use crate::utils::{parse_metas, Metas};
+use crate::utils::*;
 use derive_enum::*;
 use derive_struct::*;
 pub use fields::*;
@@ -95,16 +95,13 @@ impl Parse for DeriveTypeDef {
         use syn::spanned::Spanned;
 
         let derive_input = input.parse::<syn::DeriveInput>()?;
-        let span = derive_input.span();
-        let metas = parse_metas(&derive_input.attrs)?;
-        let data = DeriveData::try_from(derive_input.data)?;
 
         Ok(DeriveTypeDef {
-            span,
-            metas,
+            span: derive_input.span(),
+            metas: Metas::from_attributes(derive_input.attrs)?,
             name: derive_input.ident,
             generics: derive_input.generics,
-            data,
+            data: DeriveData::try_from(derive_input.data)?,
         })
     }
 }

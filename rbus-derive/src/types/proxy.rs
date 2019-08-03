@@ -1,5 +1,5 @@
 use super::ImplGenerator;
-use crate::utils::Metas;
+use crate::utils::*;
 use proc_macro2::{Span, TokenStream};
 use syn::Result;
 
@@ -24,21 +24,21 @@ pub fn gen_proxy_methods(gen: &ImplGenerator, span: Span, proxy: Metas) -> Resul
     };
 
     Ok(vec![
-        ("code", gen.gen_code_method(quote::quote!(<#proxy_ty>::code()), None)),
+        ("code", gen.gen_code_method(quote::quote!(<#proxy_ty>::code()), &[])),
         (
             "signature",
-            gen.gen_signature_method(quote::quote!(<#proxy_ty>::signature()), None),
+            gen.gen_signature_method(quote::quote!(<#proxy_ty>::signature()), &[]),
         ),
         (
             "alignment",
-            gen.gen_alignment_method(quote::quote!(<#proxy_ty>::alignment()), None),
+            gen.gen_alignment_method(quote::quote!(<#proxy_ty>::alignment()), &[]),
         ),
         (
             "encode",
             gen.gen_encode_method(
                 syn::parse_quote!(marshaller),
                 quote::quote!(#getter.encode(marshaller)),
-                None,
+                &[],
             ),
         ),
         (
@@ -49,7 +49,7 @@ pub fn gen_proxy_methods(gen: &ImplGenerator, span: Span, proxy: Metas) -> Resul
                     let value = <#proxy_ty>::decode(marshaller)?;
                     Ok(#setter)
                 },
-                None,
+                &[],
             ),
         ),
     ])

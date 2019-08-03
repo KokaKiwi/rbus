@@ -1,14 +1,19 @@
-use super::Metas;
-use proc_macro2::Span;
-use syn::ext::IdentExt;
+use super::{MetaValue, Metas};
+use syn::spanned::Spanned;
 
 pub trait DBusMetas {
     fn metas(&self) -> &Metas;
 
-    fn find_rbus_module<T: AsRef<str>>(&self, default: T) -> syn::Ident {
-        self.metas()
-            .find_meta_value_parse_with("module", syn::Ident::parse_any)
-            .unwrap_or_else(|_| syn::Ident::new(default.as_ref(), Span::call_site()))
+    fn find_rbus_module<T: AsRef<str>>(&self, default: T) -> MetaValue {
+        match self.metas().find_meta_value("module").cloned() {
+            Some(meta) => match meta {
+                MetaValue::Word(..) => meta,
+                MetaValue::Path(..) => meta,
+                MetaValue::Lit(syn::Lit::Str(lit)) => lit.parse().unwrap(),
+                _ => MetaValue::Word(syn::Ident::new("rbus", self.metas().span())),
+            },
+            _ => MetaValue::Word(syn::Ident::new(default.as_ref(), self.metas().span())),
+        }
     }
 }
 

@@ -1,14 +1,11 @@
-use crate::utils::Metas;
+use crate::utils::*;
 pub use basic::impl_basic_type;
 pub use derive::*;
 pub use gen::ImplGenerator;
 use method::Methods;
 use proc_macro2::{Span, TokenStream};
 pub use proxy::gen_proxy_methods;
-use syn::{
-    parse::{Parse, ParseStream, Result},
-    spanned::Spanned,
-};
+use syn::parse::{Parse, ParseStream, Result};
 
 mod basic;
 mod derive;
@@ -30,18 +27,18 @@ impl TypeDef {
         let dbus = self.metas.find_meta_nested("dbus");
         let proxy = dbus.find_meta_nested("proxy");
 
-        let code_body = self.gen_code_body()?;
-        let signature_body = self.gen_signature_body()?;
-        let alignment_body = self.gen_alignment_body()?;
+        let code_body = self.gen_code_body();
+        let signature_body = self.gen_signature_body();
+        let alignment_body = self.gen_alignment_body();
 
         let methods = self.methods;
 
         let mut gen = ImplGenerator::new(Span::call_site(), self.metas, Some(self.generics), self.ty);
         gen.options.default_rbus_module = "crate".into();
 
-        gen.add_method("code", gen.gen_code_method(code_body, None));
-        gen.add_method("signature", gen.gen_signature_method(signature_body, None));
-        gen.add_method("alignment", gen.gen_alignment_method(alignment_body, None));
+        gen.add_method("code", gen.gen_code_method(code_body, &[]));
+        gen.add_method("signature", gen.gen_signature_method(signature_body, &[]));
+        gen.add_method("alignment", gen.gen_alignment_method(alignment_body, &[]));
 
         if !proxy.is_empty() {
             let methods = gen_proxy_methods(&gen, Span::call_site(), proxy)?;
@@ -63,32 +60,31 @@ impl TypeDef {
         self.code.as_ref().map(|code| code.value()).unwrap_or('\0')
     }
 
-    fn gen_code_body(&self) -> Result<TokenStream> {
+    fn gen_code_body(&self) -> TokenStream {
         let code = self.code();
 
-        Ok(quote::quote!(#code as u8))
+        quote::quote!(#code as u8)
     }
 
-    fn gen_signature_body(&self) -> Result<TokenStream> {
+    fn gen_signature_body(&self) -> TokenStream {
         let signature = self
             .metas
             .find_meta_nested("dbus")
-            .find_meta_value_str("signature")?
+            .find_meta_value_str("signature")
             .map(|value| value.value())
             .unwrap_or_else(|| format!("{}", self.code()));
 
-        Ok(quote::quote!(#signature.into()))
+        quote::quote!(#signature.into())
     }
 
-    fn gen_alignment_body(&self) -> Result<TokenStream> {
-        let alignment = match self.metas.find_meta_nested("dbus").find_meta_value("align")? {
+    fn gen_alignment_body(&self) -> TokenStream {
+        let alignment = match self.metas.find_meta_nested("dbus").find_meta_value_lit("align") {
             Some(syn::Lit::Int(lit)) => quote::quote!(#lit as u8),
             Some(syn::Lit::Str(lit)) if lit.value() == "size" => quote::quote!(std::mem::size_of::<Self>() as u8),
-            Some(lit) => return Err(syn::Error::new(lit.span(), "Bad align value, only integer or \"size\"")),
-            None => quote::quote!(1),
+            _ => quote::quote!(1),
         };
 
-        Ok(quote::quote!(#alignment))
+        quote::quote!(#alignment)
     }
 }
 
@@ -96,7 +92,8 @@ impl Parse for TypeDef {
     fn parse(input: ParseStream) -> Result<Self> {
         use crate::ext::GenericsExt;
 
-        let metas = input.parse()?;
+        let attrs = input.call(Attribute::parse_many)?;
+        let metas = attrs.into_iter().collect();
 
         let mut generics = if input.peek(syn::Token![impl]) {
             input.parse::<syn::Token![impl]>()?;

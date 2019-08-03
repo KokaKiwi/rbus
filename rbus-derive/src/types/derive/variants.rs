@@ -1,5 +1,5 @@
 use super::Fields;
-use crate::utils::{parse_metas, Metas};
+use crate::utils::*;
 use proc_macro2::Span;
 use std::{convert::TryFrom, ops::Deref};
 use syn::{spanned::Spanned, Result};
@@ -42,7 +42,7 @@ impl Variants {
         let mut indexes = Vec::with_capacity(self.0.len());
         let mut current = 0;
         for variant in self.0.iter() {
-            let value = match variant.index()? {
+            let value = match variant.index() {
                 Some(syn::Lit::Int(ref lit)) => lit.value(),
                 Some(syn::Lit::Byte(ref lit)) => lit.value() as u64,
                 _ => current,
@@ -86,11 +86,11 @@ pub struct Variant {
 }
 
 impl Variant {
-    pub fn index(&self) -> Result<Option<syn::Lit>> {
+    pub fn index(&self) -> Option<syn::Lit> {
         self.metas
             .find_meta_nested("dbus")
-            .find_meta_value("index")
-            .map(|value| value.cloned())
+            .find_meta_value_lit("index")
+            .cloned()
     }
 }
 
@@ -98,17 +98,12 @@ impl TryFrom<syn::Variant> for Variant {
     type Error = syn::Error;
 
     fn try_from(variant: syn::Variant) -> Result<Self> {
-        let span = variant.span();
-        let metas = parse_metas(variant.attrs)?;
-        let fields = Fields::try_from(variant.fields)?;
-        let value = variant.discriminant.map(|(_, value)| value);
-
         Ok(Variant {
-            span,
-            metas,
+            span: variant.span(),
+            metas: Metas::from_attributes(variant.attrs)?,
             name: variant.ident,
-            fields,
-            value,
+            fields: Fields::try_from(variant.fields)?,
+            value: variant.discriminant.map(|(_, value)| value),
         })
     }
 }

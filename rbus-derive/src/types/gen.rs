@@ -1,7 +1,4 @@
-use crate::{
-    ext::GenericsExt,
-    utils::{DBusMetas, Metas},
-};
+use crate::{ext::GenericsExt, utils::*};
 use proc_macro2::{Span, TokenStream};
 use quote::ToTokens;
 use std::collections::HashMap;
@@ -56,7 +53,7 @@ impl ImplGenerator {
         ImplGenerator::new(span, metas, Some(generics), ty)
     }
 
-    pub fn rbus_module(&self) -> syn::Ident {
+    pub fn rbus_module(&self) -> MetaValue {
         self.dbus.find_rbus_module(&self.options.default_rbus_module)
     }
 
@@ -78,7 +75,7 @@ impl ImplGenerator {
     }
 
     pub fn override_methods_from_metas(&mut self) -> Result<()> {
-        if let Some(meta) = self.dbus.find_meta_value("code")? {
+        if let Some(meta) = self.dbus.find_meta_value_lit("code") {
             let body = match meta {
                 syn::Lit::Byte(lit) => quote::quote!(#lit as u8),
                 syn::Lit::Int(lit) => quote::quote!(#lit as u8),
@@ -86,23 +83,23 @@ impl ImplGenerator {
                 lit => return Err(Error::new(lit.span(), "Bad code value, expected byte or integer")),
             };
 
-            self.add_method("code", self.gen_code_method(body, None));
+            self.add_method("code", self.gen_code_method(body, &[]));
         }
 
-        if let Some(signature) = self.dbus.find_meta_value_str("signature")? {
+        if let Some(signature) = self.dbus.find_meta_value_str("signature") {
             let body = quote::quote!(#signature.into());
 
-            self.add_method("signature", self.gen_signature_method(body, None));
+            self.add_method("signature", self.gen_signature_method(body, &[]));
         }
 
-        if let Some(align) = self.dbus.find_meta_value("align")? {
+        if let Some(align) = self.dbus.find_meta_value_lit("align") {
             let body = match align {
                 syn::Lit::Int(lit) => quote::quote!(#lit as u8),
                 syn::Lit::Str(lit) if lit.value() == "size" => quote::quote!(std::mem::size_of::<Self>() as u8),
                 lit => return Err(Error::new(lit.span(), "Bad align value, only integer or \"size\"")),
             };
 
-            self.add_method("alignment", self.gen_alignment_method(body, None));
+            self.add_method("alignment", self.gen_alignment_method(body, &[]));
         }
 
         Ok(())
@@ -137,23 +134,23 @@ impl ImplGenerator {
         Ok(tokens)
     }
 
-    pub fn gen_code_method<Body: ToTokens>(&self, body: Body, metas: Option<&Metas>) -> TokenStream {
+    pub fn gen_code_method<Body: ToTokens>(&self, body: Body, attrs: &[Attribute]) -> TokenStream {
         quote::quote! {
-            #metas
+            #(#attrs)*
             fn code() -> u8 { #body }
         }
     }
 
-    pub fn gen_signature_method<Body: ToTokens>(&self, body: Body, metas: Option<&Metas>) -> TokenStream {
+    pub fn gen_signature_method<Body: ToTokens>(&self, body: Body, attrs: &[Attribute]) -> TokenStream {
         quote::quote! {
-            #metas
+            #(#attrs)*
             fn signature() -> String { #body }
         }
     }
 
-    pub fn gen_alignment_method<Body: ToTokens>(&self, body: Body, metas: Option<&Metas>) -> TokenStream {
+    pub fn gen_alignment_method<Body: ToTokens>(&self, body: Body, attrs: &[Attribute]) -> TokenStream {
         quote::quote! {
-            #metas
+            #(#attrs)*
             fn alignment() -> u8 { #body }
         }
     }
@@ -162,12 +159,12 @@ impl ImplGenerator {
         &self,
         marshaller: syn::Ident,
         body: Body,
-        metas: Option<&Metas>,
+        attrs: &[Attribute],
     ) -> TokenStream {
         let rbus_module = self.rbus_module();
 
         quote::quote! {
-            #metas
+            #(#attrs)*
             fn encode<Inner>(&self, #marshaller: &mut #rbus_module::marshal::Marshaller<Inner>)
                 -> #rbus_module::Result<()>
             where
@@ -182,12 +179,12 @@ impl ImplGenerator {
         &self,
         marshaller: syn::Ident,
         body: Body,
-        metas: Option<&Metas>,
+        attrs: &[Attribute],
     ) -> TokenStream {
         let rbus_module = self.rbus_module();
 
         quote::quote! {
-            #metas
+            #(#attrs)*
             fn decode<Inner>(#marshaller: &mut #rbus_module::marshal::Marshaller<Inner>)
                 -> #rbus_module::Result<Self>
             where
