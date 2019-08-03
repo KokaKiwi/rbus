@@ -8,7 +8,7 @@ use std::io::prelude::*;
 // Basic strings
 // TODO: Validate strings? (according to DBus specs)
 impl_type! {
-    #[dbus(basic, align = 4, module = "crate")]
+    #[dbus(basic, align = 4, module = crate)]
     &str: 's' {
         encode(marshaller) {
             marshaller.io().write_u32(self.len() as u32)?;
@@ -28,7 +28,7 @@ impl_type! {
 }
 
 impl_type! {
-    #[dbus(basic, align = 4, module = "crate")]
+    #[dbus(basic, align = 4, module = crate)]
     String: 's' {
         encode(marshaller) {
             self.as_str().encode(marshaller)
@@ -163,7 +163,7 @@ impl AsRef<str> for Signature {
 }
 
 impl_type! {
-    #[dbus(basic, module = "crate")]
+    #[dbus(basic, module = crate)]
     Signature: 'g' {
         encode(marshaller) {
             marshaller.io().write_u8(self.len() as u8)?;
