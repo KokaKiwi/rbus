@@ -3,26 +3,11 @@
 extern crate proc_macro;
 
 use proc_macro::TokenStream;
-use syn::parse_macro_input;
+use proc_macro_utils::impl_macro_input;
 
 mod ext;
 mod types;
 mod utils;
-
-macro_rules! impl_macro_input {
-    ($fun:path, $($arg:ident: $ty:ty),*) => {
-        $fun($(parse_macro_input!($arg as $ty)),*)
-    };
-    ($fun:path, $($arg:ident),*) => ( impl_macro_input!($fun, $($arg: _),*) );
-
-    (? $fun:path, $($arg:ident: $ty:ty),*) => {
-        match $fun($(parse_macro_input!($arg as $ty)),*) {
-            Ok(data) => data.into(),
-            Err(err) => err.to_compile_error().into(),
-        }
-    };
-    (? $fun:path, $($arg:ident),*) => ( impl_macro_input!(? $fun, $($arg: _),*) );
-}
 
 #[doc(hidden)]
 #[proc_macro]
