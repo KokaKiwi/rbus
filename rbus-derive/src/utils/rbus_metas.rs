@@ -5,14 +5,15 @@ pub trait DBusMetas {
     fn metas(&self) -> &Metas;
 
     fn find_rbus_module<T: AsRef<str>>(&self, default: T) -> MetaValue {
+        let default = default.as_ref();
+
         match self.metas().find_meta_value("module").cloned() {
             Some(meta) => match meta {
-                MetaValue::Word(..) => meta,
-                MetaValue::Path(..) => meta,
+                MetaValue::Name(..) => meta,
                 MetaValue::Lit(syn::Lit::Str(lit)) => lit.parse().unwrap(),
-                _ => MetaValue::Word(syn::Ident::new("rbus", self.metas().span())),
+                _ => MetaValue::Name(syn::Ident::new(default, self.metas().span()).into()),
             },
-            _ => MetaValue::Word(syn::Ident::new(default.as_ref(), self.metas().span())),
+            _ => MetaValue::Name(syn::Ident::new(default, self.metas().span()).into()),
         }
     }
 }
