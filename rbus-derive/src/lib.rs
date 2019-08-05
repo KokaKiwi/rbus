@@ -12,15 +12,15 @@ mod utils;
 #[doc(hidden)]
 #[proc_macro]
 pub fn impl_basic_type(item: TokenStream) -> TokenStream {
-    impl_macro_input!(?types::impl_basic_type, item)
+    impl_macro_input!(types::impl_basic_type(item)?)
 }
 
 #[proc_macro]
 pub fn impl_type(item: TokenStream) -> TokenStream {
-    impl_macro_input!(?types::impl_type, item)
+    impl_macro_input!(types::impl_type(item)?)
 }
 
 #[proc_macro_derive(DBusType, attributes(dbus))]
 pub fn derive_dbus_type(item: TokenStream) -> TokenStream {
-    impl_macro_input!(?types::derive_type, item)
+    impl_macro_input!(types::derive_type(item)?)
 }
